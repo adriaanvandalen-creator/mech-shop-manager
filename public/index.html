@@ -881,6 +881,42 @@ body{background:linear-gradient(180deg,#ece7dd 0%,#e7e1d5 52%,#eadfe9 100%) fixe
 .page-title{color:var(--ink);}
 /* a hint of the neon accent on active nav, app-wide */
 .snav-btn.active::before,.bnav-btn.active::after{background:#8a2be2!important;}
+
+/* ════════════════════════════════════════════════════════════════
+   REAL CITYSCAPE BACKGROUND (bg.png) + purple-aligned UI
+   ════════════════════════════════════════════════════════════════ */
+body{background:#1b1030 url('/assets/bg.png') center center / cover no-repeat fixed!important;}
+/* the photo already carries skyline, graffiti, smoke & corner frames — hide the CSS ones */
+#app-scene,.scene-city,.scene-smoke,.scene-corner,.lr-graffiti,.lr-corner,.lr-scene{display:none!important;}
+/* login: photo supplies the "UNITY REJECTS" wordmark, so drop the duplicate heading */
+#login-screen .login-logo h1{display:none;}
+#login-screen .server-tagline,#login-screen .product-label{color:#e9ddff!important;text-shadow:0 1px 10px rgba(30,10,60,.6);}
+.login-logo .server-logo{filter:drop-shadow(0 0 18px rgba(150,60,230,.75)) drop-shadow(0 0 48px rgba(120,40,200,.55));}
+
+/* ── purple chrome (buttons / FAB / active states) ── */
+.btn-primary,.lbtn{background:linear-gradient(180deg,#9333ea,#6a1fb8)!important;color:#fff!important;box-shadow:0 6px 18px -8px rgba(138,43,226,.5)!important;}
+.btn-primary:hover,.lbtn:hover{background:linear-gradient(180deg,#a855f7,#7c23c9)!important;}
+.fab{background:linear-gradient(145deg,#9333ea,#6a1fb8)!important;color:#fff!important;}
+.fab:hover{background:linear-gradient(145deg,#a855f7,#7c23c9)!important;}
+.week-tab.active{background:linear-gradient(180deg,#9333ea,#6a1fb8)!important;color:#fff!important;border-color:#8a2be2!important;}
+.snav-btn.active{color:#2a1840!important;}
+.snav-btn.active .si{color:#8a2be2!important;}
+.toast.success,.toast.info{background:#6a1fb8!important;color:#fff!important;}
+.btn-outline:hover{border-color:#8a2be2!important;color:#5a1fb0!important;}
+input:focus,select:focus,textarea:focus,.linput:focus{border-color:#8a2be2!important;box-shadow:0 0 0 3px rgba(138,43,226,.14)!important;}
+.price-cat-header::before,.page-title::before,.modal-title::before{background:linear-gradient(#9333ea,#6a1fb8)!important;}
+
+/* ── readable glass over the busy photo ── */
+@media(min-width:769px){ #sidebar{background:rgba(252,250,248,.84)!important;backdrop-filter:blur(16px) saturate(1.1);-webkit-backdrop-filter:blur(16px);border-right:1px solid rgba(255,255,255,.5)!important;} }
+.header{background:rgba(252,250,248,.86)!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.bottom-nav{background:rgba(252,250,248,.9)!important;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);}
+.card,.board-col,.order-card,.tab-card,.pay-card,.material-card,.stock-card,.clock-widget{background:rgba(255,255,255,.85)!important;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+.board-card{background:rgba(255,255,255,.92)!important;}
+.login-card{background:rgba(255,255,255,.60)!important;backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.7)!important;box-shadow:0 0 0 1px rgba(150,60,230,.3),0 24px 64px -22px rgba(60,15,130,.6)!important;}
+#login-screen .shop-item{background:rgba(255,255,255,.84)!important;}
+#login-screen .shop-item .shop-arrow{color:#8a2be2!important;}
+.modal{background:rgba(253,251,249,.95)!important;}
+.modal-overlay{background:rgba(24,10,44,.5)!important;backdrop-filter:blur(3px);}
 </style>
 </head>
 <body>
