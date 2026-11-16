@@ -996,15 +996,12 @@ input:focus,select:focus,textarea:focus,.linput:focus{border-color:#8a2be2!impor
   <!-- Step 2: Select role -->
   <div class="login-card" id="step-role" style="display:none">
     <h2 id="selected-shop-label">— Select Role —</h2>
-    <div class="role-grid">
+    <div class="role-grid" style="grid-template-columns:repeat(2,1fr)">
       <div class="role-card" onclick="selectRole('boss')">
         <div class="ri"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11.56 3.69a.5.5 0 0 1 .88 0l2.5 4.56 4.98-1.2a.5.5 0 0 1 .6.63l-2.1 7.02a1 1 0 0 1-.96.7H6.54a1 1 0 0 1-.96-.7L3.48 7.68a.5.5 0 0 1 .6-.63l4.98 1.2 2.5-4.56Z"/><path d="M5 20h14"/></svg></div><div class="rn">Boss</div><div class="rd">Full access</div>
       </div>
       <div class="role-card" onclick="selectRole('mechanic')">
         <div class="ri"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><div class="rn">Mechanic</div><div class="rd">My orders</div>
-      </div>
-      <div class="role-card" onclick="selectRole('admin')">
-        <div class="ri"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg></div><div class="rn">Admin</div><div class="rd">Admin access</div>
       </div>
     </div>
 
