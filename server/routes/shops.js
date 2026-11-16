@@ -218,10 +218,26 @@ router.post('/:shopId/change-pin', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Delete shop (dev only) — cascades all data
+// Rename a shop (admin/dev)
+router.patch('/:shopId/name', async (req, res) => {
+  const u = req.session.user;
+  if (!u || (u.role !== 'admin' && u.role !== 'dev')) return res.status(403).json({ error: 'Admin only' });
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Name required' });
+  try {
+    const { rows } = await pool.query('UPDATE shops SET name=$1 WHERE id=$2 RETURNING id, name', [name, req.params.shopId]);
+    if (!rows.length) return res.status(404).json({ error: 'Shop not found' });
+    res.json(rows[0]);
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'A shop with that name already exists' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Delete shop (admin/dev) — cascades all data. Requires matching name confirmation.
 router.delete('/:shopId', async (req, res) => {
   const u = req.session.user;
-  if (!u || u.role !== 'dev') return res.status(403).json({ error: 'Dev only' });
+  if (!u || (u.role !== 'dev' && u.role !== 'admin')) return res.status(403).json({ error: 'Admin only' });
   const { confirm } = req.body;
   const { rows } = await pool.query('SELECT name FROM shops WHERE id=$1', [req.params.shopId]);
   if (!rows.length) return res.status(404).json({ error: 'Shop not found' });
