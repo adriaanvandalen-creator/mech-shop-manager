@@ -979,6 +979,18 @@ input:focus,select:focus,textarea:focus,.linput:focus{border-color:#8a2be2!impor
     </div>
     <button class="lbtn" id="register-shop-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);display:none" onclick="showRegisterShop()">+ Register New Shop</button>
     <div id="register-shop-hint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;display:none">Contact Admin to register a new shop</div>
+
+    <!-- Admin login (global — no shop needed) -->
+    <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
+      <div id="admin-login-collapsed" style="text-align:center">
+        <a onclick="toggleAdminLogin(true)" style="color:#8a2be2;cursor:pointer;font-size:12px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em">🛡 Admin Login</a>
+      </div>
+      <div id="admin-login-form" style="display:none">
+        <input class="linput" type="password" id="admin-pin-direct" placeholder="Admin PIN" onkeydown="if(event.key==='Enter')loginAdminDirect()"/>
+        <button class="lbtn" onclick="loginAdminDirect()">Enter as Admin 🛡</button>
+        <div style="text-align:center;margin-top:6px"><a onclick="toggleAdminLogin(false)" style="color:var(--muted);cursor:pointer;font-size:11px">Cancel</a></div>
+      </div>
+    </div>
   </div>
 
   <!-- Step 2: Select role -->
@@ -2150,6 +2162,26 @@ async function loginAdmin() {
     if (me.shops && me.shops.length) { showAdminShopPicker(me.shops); }
     else { enterApp(); }
   } catch(e) { toast(e.message || 'Wrong PIN', 'error'); document.getElementById('admin-pin').value = ''; }
+}
+
+// Admin login straight from the shop-select screen (no shop needed)
+function toggleAdminLogin(show) {
+  document.getElementById('admin-login-collapsed').style.display = show ? 'none' : 'block';
+  document.getElementById('admin-login-form').style.display = show ? 'block' : 'none';
+  if (show) setTimeout(() => document.getElementById('admin-pin-direct').focus(), 50);
+}
+async function loginAdminDirect() {
+  const pin = document.getElementById('admin-pin-direct').value;
+  if (!pin) { toast('Enter Admin PIN', 'error'); return; }
+  try {
+    me = await POST('/shops/login/admin', { pin });
+    if (me.shops && me.shops.length) {
+      // enter straight into the app managing the first shop (switch others via the Admin panel)
+      await POST('/shops/login/admin/switch', { shopId: me.shops[0].id });
+      me.shopId = me.shops[0].id; me.shopName = me.shops[0].name;
+    }
+    enterApp();
+  } catch(e) { toast(e.message || 'Wrong PIN', 'error'); document.getElementById('admin-pin-direct').value = ''; }
 }
 
 function showAdminShopPicker(shops) {
