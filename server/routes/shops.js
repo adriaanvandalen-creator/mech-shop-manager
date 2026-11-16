@@ -15,7 +15,8 @@ router.get('/', async (req, res) => {
 
 // Register a new shop
 router.post('/register', async (req, res) => {
-  const { name, boss_pin } = req.body;
+  const { name } = req.body;
+  const boss_pin = req.body.boss_pin || req.body.pin; // accept either field name
   if (!name || !boss_pin) return res.status(400).json({ error: 'Name and boss PIN required' });
   if (boss_pin.length < 4) return res.status(400).json({ error: 'PIN must be at least 4 characters' });
 
