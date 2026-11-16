@@ -1169,6 +1169,16 @@ select option{background:var(--card);color:var(--ink);}
         <div class="fg"><label>Confirm PIN</label>
           <input id="admin-reg-pin2" type="password" placeholder="Confirm PIN" maxlength="20"/>
         </div>
+        <div class="fg"><label>Shop Logo (optional)</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div id="admin-reg-logo-preview" style="width:48px;height:48px;border-radius:8px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0"><span style="font-size:20px">🔧</span></div>
+            <div>
+              <label for="admin-reg-logo" class="btn btn-outline btn-sm" style="cursor:pointer;display:inline-flex;margin-bottom:4px">📂 Upload Logo</label>
+              <input type="file" id="admin-reg-logo" accept="image/*" style="display:none" onchange="previewRegLogo(this)"/>
+              <div style="font-size:11px;color:var(--muted)">PNG/JPG — auto-resized. You can also change it later in Settings.</div>
+            </div>
+          </div>
+        </div>
         <button class="btn btn-primary" onclick="adminRegisterShop()">➕ Create Shop</button>
       </div>
       <div class="card">
@@ -6040,6 +6050,31 @@ async function adminChangeWorkerPin(id, name) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+// Logo picker for Register New Shop — resize to ~220px, keep as base64 data URL
+let _regLogoBase64 = null;
+function previewRegLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) { toast('File too large — use under 3MB', 'error'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const max = 220;
+      const ratio = Math.min(max / img.width, max / img.height, 1);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      _regLogoBase64 = canvas.toDataURL('image/png', 0.85);
+      const p = document.getElementById('admin-reg-logo-preview');
+      if (p) p.innerHTML = `<img src="${_regLogoBase64}" style="width:100%;height:100%;object-fit:contain;padding:2px"/>`;
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function adminRegisterShop() {
   const name = document.getElementById('admin-reg-name').value.trim();
   const pin  = document.getElementById('admin-reg-pin').value;
@@ -6048,14 +6083,20 @@ async function adminRegisterShop() {
   if (pin.length < 4) { toast('PIN must be 4+ characters', 'error'); return; }
   if (pin !== pin2) { toast('PINs do not match', 'error'); return; }
   try {
-    await POST('/shops/register', { name, pin });
+    await POST('/shops/register', { name, pin, logo_image: _regLogoBase64 });
     toast('Shop "' + name + '" created!', 'success');
     document.getElementById('admin-reg-name').value = '';
     document.getElementById('admin-reg-pin').value = '';
     document.getElementById('admin-reg-pin2').value = '';
-    // Refresh admin shop switcher
-    const r = await fetch('/api/shops');
-    if (r.ok) { const data = await r.json(); me.shops = data; enterApp(); }
+    _regLogoBase64 = null;
+    const lp = document.getElementById('admin-reg-logo-preview'); if (lp) lp.innerHTML = '<span style="font-size:20px">🔧</span>';
+    const li = document.getElementById('admin-reg-logo'); if (li) li.value = '';
+    // Refresh shop lists (switcher + manage list) without leaving the Admin panel
+    const r = await fetch('/api/shops', { credentials: 'include' });
+    if (r.ok) me.shops = await r.json();
+    loadAdminShops();
+    const sel = document.getElementById('admin-shop-select');
+    if (sel && me.shops) sel.innerHTML = me.shops.map(s => `<option value="${s.id}"${String(s.id)===String(me.shopId)?' selected':''}>${s.name}</option>`).join('');
   } catch(e) { toast(e.message || 'Failed to create shop', 'error'); }
 }
 

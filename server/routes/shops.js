@@ -17,16 +17,18 @@ router.get('/', async (req, res) => {
 router.post('/register', async (req, res) => {
   const { name } = req.body;
   const boss_pin = req.body.boss_pin || req.body.pin; // accept either field name
+  const logo_image = req.body.logo_image || null;     // optional base64 data URL
   if (!name || !boss_pin) return res.status(400).json({ error: 'Name and boss PIN required' });
   if (boss_pin.length < 4) return res.status(400).json({ error: 'PIN must be at least 4 characters' });
+  if (logo_image && logo_image.length > 700000) return res.status(400).json({ error: 'Logo too large. Use an image under 500KB.' });
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const hash = await bcrypt.hash(boss_pin, 10);
 
   try {
     const { rows } = await pool.query(
-      'INSERT INTO shops (name, slug, boss_pin) VALUES ($1, $2, $3) RETURNING id, name, slug',
-      [name.trim(), slug, hash]
+      'INSERT INTO shops (name, slug, boss_pin, logo_image) VALUES ($1, $2, $3, $4) RETURNING id, name, slug',
+      [name.trim(), slug, hash, logo_image]
     );
     // Seed default prices
     await seedPrices(rows[0].id);
