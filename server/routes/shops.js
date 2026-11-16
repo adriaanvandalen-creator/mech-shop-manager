@@ -13,6 +13,22 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Admin overview — EVERY shop with its bosses + workers (and readable PINs) on one page
+router.get('/overview', async (req, res) => {
+  const u = req.session.user;
+  if (!u || (u.role !== 'admin' && u.role !== 'dev')) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { rows: shops }   = await pool.query('SELECT id, name, logo_image, logo_emoji FROM shops ORDER BY name');
+    const { rows: bosses }  = await pool.query('SELECT id, shop_id, name, avatar, pin_plain FROM bosses ORDER BY name');
+    const { rows: workers } = await pool.query('SELECT id, shop_id, name, avatar, pin_plain FROM mechanics ORDER BY name');
+    res.json(shops.map(s => ({
+      id: s.id, name: s.name, logo_image: s.logo_image, logo_emoji: s.logo_emoji,
+      bosses:  bosses.filter(b => b.shop_id === s.id),
+      workers: workers.filter(w => w.shop_id === s.id),
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Register a new shop
 router.post('/register', async (req, res) => {
   const { name } = req.body;

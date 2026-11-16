@@ -1324,36 +1324,15 @@ input:focus,select:focus,textarea:focus,.linput:focus{border-color:#8a2be2!impor
 
     <!-- ADMIN PANEL -->
     <div class="page" id="page-admin">
-      <div class="page-title">
-        <span>Admin Panel</span>
-        <select id="admin-shop-select" onchange="adminPanelSwitchShop(this.value, this.options[this.selectedIndex].text)" style="width:auto;font-size:13px;padding:7px 12px;font-family:'Inter',system-ui,sans-serif"></select>
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin:-10px 0 18px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em">Managing <span id="admin-managing-shop">—</span> · one login manages every shop</div>
+      <div class="page-title"><span>Admin Panel</span></div>
+      <div style="font-size:12px;color:var(--muted);margin:-10px 0 18px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em">One login · every shop managed below</div>
       <div class="card mb-3">
         <div class="card-title">Online Now</div>
         <div id="admin-online-mechs"><div class="empty">No mechanics clocked in</div></div>
       </div>
 
-      <!-- MANAGE BOSSES (admin assigns, max 2 per shop, PINs visible) -->
-      <div class="card mb-3">
-        <div class="card-title">Bosses — <span id="admin-bosses-shop">—</span></div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Assign up to 2 bosses to this shop. Only you (admin) can see or change their PINs.</div>
-        <div id="admin-bosses-list" style="margin-bottom:12px"></div>
-        <div id="admin-add-boss-wrap" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <input id="admin-boss-name" placeholder="Boss name" style="flex:1;min-width:120px"/>
-          <input id="admin-boss-avatar" placeholder="👑" maxlength="2" style="width:56px;text-align:center"/>
-          <input id="admin-boss-pin" placeholder="PIN (4+)" style="width:100px"/>
-          <button class="btn btn-primary btn-sm" onclick="adminAddBoss()">+ Assign Boss</button>
-        </div>
-        <div id="admin-boss-max-note" style="display:none;font-size:12px;color:var(--muted);margin-top:4px">Maximum of 2 bosses reached. Remove one to assign another.</div>
-      </div>
-
-      <!-- WORKER PINS (admin can see & change) -->
-      <div class="card mb-3">
-        <div class="card-title">Worker PINs — <span id="admin-workers-shop">—</span></div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Players are created by the boss. You can see and change their PINs here.</div>
-        <div id="admin-workers-list"></div>
-      </div>
+      <!-- ALL SHOPS — bosses + workers for every shop on one page -->
+      <div id="admin-overview"></div>
 
       <!-- MANAGE SHOPS (rename / delete any shop) -->
       <div class="card mb-3">
@@ -6088,18 +6067,8 @@ async function clearLog() {
 //  ADMIN
 // ══════════════════════════════════════════
 function renderAdmin() {
-  // Universal shop selector — admin manages every shop from one login
-  const sel = document.getElementById('admin-shop-select');
-  if (sel && me.shops) {
-    sel.innerHTML = me.shops.map(s => `<option value="${s.id}"${String(s.id)===String(me.shopId)?' selected':''}>${s.name}</option>`).join('');
-  }
-  const shopName = me.shopName || '—';
-  const mgn = document.getElementById('admin-managing-shop'); if (mgn) mgn.textContent = shopName;
-  const bn = document.getElementById('admin-bosses-shop'); if (bn) bn.textContent = shopName;
-  const wn = document.getElementById('admin-workers-shop'); if (wn) wn.textContent = shopName;
-  loadAdminBosses();
-  renderAdminWorkers();
-  loadAdminShops();
+  loadShopsOverview();   // every shop's bosses + workers on one page
+  loadAdminShops();      // rename / delete / clear data
 
   const online = mechanics.filter(m => m.clocked_in);
   const mechDiv = document.getElementById('admin-online-mechs');
@@ -6148,6 +6117,83 @@ async function adminPanelSwitchShop(shopId, shopName) {
     nav('admin');
     toast('Now managing ' + shopName, 'info');
   } catch(e) { toast(e.message || 'Switch failed', 'error'); }
+}
+
+// ── Admin: ALL shops' bosses + workers on one page ──
+let shopsOverview = [];
+async function loadShopsOverview() {
+  try { shopsOverview = await GET('/shops/overview'); } catch(e) { shopsOverview = []; }
+  renderShopsOverview();
+}
+function renderShopsOverview() {
+  const el = document.getElementById('admin-overview');
+  if (!el) return;
+  if (!shopsOverview.length) { el.innerHTML = '<div class="card"><div class="empty">No shops.</div></div>'; return; }
+  el.innerHTML = shopsOverview.map(s => {
+    const atMax = s.bosses.length >= 2;
+    const logo = s.logo_image ? `<img src="${s.logo_image}" style="width:100%;height:100%;object-fit:contain;padding:2px"/>` : `<span style="font-size:16px">${s.logo_emoji||'🔧'}</span>`;
+    return `<div class="card mb-3">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="width:34px;height:34px;border-radius:8px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">${logo}</div>
+        <div class="card-title" style="margin:0;padding:0;border:none;font-size:14px;color:var(--ink)">${s.name}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:4px 0 6px">Bosses (${s.bosses.length}/2)</div>
+      ${s.bosses.length ? s.bosses.map(b => `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">
+          <span style="font-size:17px">${b.avatar||'👑'}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${b.name}</div><div style="font-size:11px;color:var(--muted)">PIN <strong style="font-family:var(--mono);color:var(--ink);letter-spacing:.08em">${b.pin_plain||'—'}</strong></div></div>
+          <button class="btn btn-outline btn-sm" onclick="ovBossPin(${s.id},${b.id},'${b.name.replace(/'/g,"\\'")}')">PIN</button>
+          <button class="btn btn-danger btn-sm" onclick="ovBossRemove(${s.id},${b.id},'${b.name.replace(/'/g,"\\'")}')">✕</button>
+        </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:4px 0">No bosses assigned.</div>'}
+      ${atMax ? '' : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <input id="ovbn-${s.id}" placeholder="Boss name" style="flex:1;min-width:110px"/>
+        <input id="ovba-${s.id}" placeholder="👑" maxlength="2" style="width:50px;text-align:center"/>
+        <input id="ovbp-${s.id}" placeholder="PIN (4+)" style="width:90px"/>
+        <button class="btn btn-primary btn-sm" onclick="ovBossAdd(${s.id})">+ Assign</button>
+      </div>`}
+      <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 6px">Workers (${s.workers.length})</div>
+      ${s.workers.length ? s.workers.map(w => `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">
+          <span style="font-size:17px">${w.avatar||'🔧'}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${w.name}</div><div style="font-size:11px;color:var(--muted)">PIN <strong style="font-family:var(--mono);color:var(--ink);letter-spacing:.08em">${w.pin_plain||'— none —'}</strong></div></div>
+          <button class="btn btn-outline btn-sm" onclick="ovWorkerPin(${s.id},${w.id},'${w.name.replace(/'/g,"\\'")}')">PIN</button>
+        </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:4px 0">No workers yet (added by the boss).</div>'}
+    </div>`;
+  }).join('');
+}
+// actions switch the admin session to the target shop, act, then refresh the overview
+async function ovAct(shopId, fn) {
+  try {
+    await POST('/shops/login/admin/switch', { shopId });
+    me.shopId = shopId;
+    const sh = (me.shops||[]).find(x=>x.id===shopId); if (sh) me.shopName = sh.name;
+    await fn();
+    await loadShopsOverview();
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function ovBossAdd(shopId) {
+  const name = (document.getElementById('ovbn-'+shopId).value||'').trim();
+  const avatar = (document.getElementById('ovba-'+shopId).value||'').trim() || '👑';
+  const pin = document.getElementById('ovbp-'+shopId).value||'';
+  if (!name) { toast('Enter boss name','error'); return; }
+  if (pin.length < 4) { toast('PIN must be 4+ chars','error'); return; }
+  await ovAct(shopId, async()=>{ await POST('/bosses', { name, avatar, pin }); toast(`Boss ${name} assigned`,'success'); });
+}
+async function ovBossPin(shopId, id, name) {
+  const pin = prompt(`New PIN for boss ${name} (4+ chars):`);
+  if (pin == null) return;
+  if (pin.trim().length < 4) { toast('PIN must be 4+ chars','error'); return; }
+  await ovAct(shopId, async()=>{ await POST(`/bosses/${id}/pin`, { pin: pin.trim() }); toast('Boss PIN updated','success'); });
+}
+async function ovBossRemove(shopId, id, name) {
+  if (!confirm(`Remove boss "${name}"?`)) return;
+  await ovAct(shopId, async()=>{ await DELETE(`/bosses/${id}`); toast(`${name} removed`,'success'); });
+}
+async function ovWorkerPin(shopId, id, name) {
+  const pin = prompt(`New login PIN for ${name} (4+ chars):`);
+  if (pin == null) return;
+  if (pin.trim().length < 4) { toast('PIN must be 4+ chars','error'); return; }
+  await ovAct(shopId, async()=>{ await POST(`/mechanics/${id}/pin`, { pin: pin.trim() }); toast('Worker PIN updated','success'); });
 }
 
 // ── Admin: manage all shops (rename / delete) ──
