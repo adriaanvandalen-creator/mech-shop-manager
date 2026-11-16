@@ -248,6 +248,38 @@ router.delete('/:shopId', async (req, res) => {
   res.json({ ok: true, deleted: rows[0].name });
 });
 
+// Clear a shop's operational data (orders/timesheets/tabs/clients/history) — keeps
+// the shop, bosses, workers, prices and crafting setup. Admin/dev only.
+async function clearShopData(shopId) {
+  await pool.query('DELETE FROM tab_charges WHERE shop_id=$1', [shopId]);
+  await pool.query('DELETE FROM tab_accounts WHERE shop_id=$1', [shopId]);
+  await pool.query('DELETE FROM orders WHERE shop_id=$1', [shopId]);
+  await pool.query('DELETE FROM timesheets WHERE shop_id=$1', [shopId]);
+  await pool.query('DELETE FROM craft_log WHERE shop_id=$1', [shopId]);
+  await pool.query('DELETE FROM material_contributions WHERE shop_id=$1', [shopId]);
+  await pool.query('DELETE FROM activity_log WHERE shop_id=$1', [shopId]);
+  await pool.query('DELETE FROM clients WHERE shop_id=$1', [shopId]);
+  await pool.query('UPDATE mechanics SET clocked_in=false, clock_in_time=NULL, current_ts_id=NULL WHERE shop_id=$1', [shopId]);
+}
+router.post('/:shopId/clear-data', async (req, res) => {
+  const u = req.session.user;
+  if (!u || (u.role !== 'admin' && u.role !== 'dev')) return res.status(403).json({ error: 'Admin only' });
+  const { confirm } = req.body;
+  try {
+    if (req.params.shopId === 'all') {
+      if (confirm !== 'CLEAR ALL') return res.status(400).json({ error: 'Type CLEAR ALL to confirm' });
+      const { rows } = await pool.query('SELECT id FROM shops');
+      for (const r of rows) await clearShopData(r.id);
+      return res.json({ ok: true, cleared: rows.length });
+    }
+    const { rows } = await pool.query('SELECT name FROM shops WHERE id=$1', [req.params.shopId]);
+    if (!rows.length) return res.status(404).json({ error: 'Shop not found' });
+    if (confirm !== rows[0].name) return res.status(400).json({ error: 'Confirmation name does not match' });
+    await clearShopData(req.params.shopId);
+    res.json({ ok: true, cleared: 1, name: rows[0].name });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Logout
 router.post('/logout', (req, res) => {
   req.session.destroy();
