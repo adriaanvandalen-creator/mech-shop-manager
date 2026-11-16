@@ -3,16 +3,21 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 
-// Use a real Postgres when DATABASE_URL is set; otherwise fall back to an
-// ephemeral in-memory database so the app can be run/tested with zero setup.
-// (In-memory data resets every restart — add DATABASE_URL for persistence.)
-const MEMORY_DB = !process.env.DATABASE_URL;
+// Use a real Postgres when a connection string is available; otherwise fall back
+// to an ephemeral in-memory database so the app can be run/tested with zero setup.
+// Accepts DATABASE_URL (Railway/Render/custom) or POSTGRES_URL (Vercel/Neon, pooled).
+const CONNECTION_STRING =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  '';
+const MEMORY_DB = !CONNECTION_STRING;
 let pool;
 
 if (!MEMORY_DB) {
   pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('railway.internal')
+    connectionString: CONNECTION_STRING,
+    ssl: CONNECTION_STRING.includes('localhost') || CONNECTION_STRING.includes('railway.internal')
       ? false
       : { rejectUnauthorized: false },
     max: process.env.VERCEL ? 1 : 20,  // serverless: 1 conn per function instance (use a pooled URL)
