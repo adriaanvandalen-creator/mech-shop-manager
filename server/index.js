@@ -6,12 +6,9 @@ const cors = require('cors');
 const path = require('path');
 const { pool, initDb, MEMORY_DB } = require('./db');
 
-// In test (in-memory) mode, keep the server alive if an unsupported query throws,
-// so one page can't take the whole demo down. (Real DB mode is unaffected.)
-if (MEMORY_DB) {
-  process.on('unhandledRejection', (e) => console.error('⚠️  unhandledRejection:', e && e.message));
-  process.on('uncaughtException',  (e) => console.error('⚠️  uncaughtException:', e && e.message));
-}
+// Never let a stray async error crash the process (keeps the server/function alive).
+process.on('unhandledRejection', (e) => console.error('⚠️  unhandledRejection:', e && (e.stack || e.message || e)));
+process.on('uncaughtException',  (e) => console.error('⚠️  uncaughtException:', e && (e.stack || e.message || e)));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -84,10 +81,20 @@ app.post('/api/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
-// Serve frontend
+// Unknown API routes → JSON 404 (not the HTML app)
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+// Serve frontend (static assets, then SPA fallback to index.html)
 app.use(express.static(path.join(__dirname, '../public')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// Final error handler — any route error returns clean JSON instead of hanging
+app.use((err, req, res, next) => {
+  console.error('Route error:', err && (err.stack || err.message || err));
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
 
 // Run a long-running server when executed directly (local / Railway / Render).
