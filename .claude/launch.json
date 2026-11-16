@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "C:\\Users\\jouma\\AppData\\Local\\Programs\\nodejs\\node.exe",
+      "runtimeArgs": [
+        "--watch",
+        "server/index.js"
+      ],
+      "port": 3000
+    }
+  ]
+}

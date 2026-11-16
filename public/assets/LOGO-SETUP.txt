@@ -1,0 +1,1 @@
+Place the official Unity Rejects logo here as unity-rejects-logo.png. Until supplied, the welcome screen displays a UR monogram. Each shop boss can upload their own shop logo under Shop Settings and save the theme. Shop logos appear in the public shop picker and in the app.

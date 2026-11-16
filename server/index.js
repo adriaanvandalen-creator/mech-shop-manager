@@ -1,0 +1,83 @@
+require('dotenv').config();
+const express = require('express');
+const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const cors = require('cors');
+const path = require('path');
+const { pool, initDb, MEMORY_DB } = require('./db');
+
+// In test (in-memory) mode, keep the server alive if an unsupported query throws,
+// so one page can't take the whole demo down. (Real DB mode is unaffected.)
+if (MEMORY_DB) {
+  process.on('unhandledRejection', (e) => console.error('⚠️  unhandledRejection:', e && e.message));
+  process.on('uncaughtException',  (e) => console.error('⚠️  uncaughtException:', e && e.message));
+}
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(express.json({ limit: '10mb' })); // large for base64 images
+app.use(express.urlencoded({ extended: true }));
+app.use(cors({ origin: true, credentials: true }));
+
+// Trust Railway's reverse proxy so secure cookies work over HTTPS
+app.set('trust proxy', 1);
+
+// Sessions stored in Postgres
+app.use(session({
+  // Postgres-backed sessions normally; in-memory test mode uses the default store
+  ...(MEMORY_DB ? {} : { store: new pgSession({ pool, createTableIfMissing: true }) }),
+  secret: process.env.SESSION_SECRET || 'lsc-secret-change-in-prod',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  }
+}));
+
+// API Routes
+app.use('/api/shops',         require('./routes/shops'));
+app.use('/api/mechanics',     require('./routes/mechanics'));
+app.use('/api/orders',        require('./routes/orders'));
+app.use('/api/timesheets',    require('./routes/timesheets'));
+app.use('/api/tabs',          require('./routes/tabs'));
+app.use('/api/log',           require('./routes/log'));
+app.use('/api/prices',        require('./routes/prices'));
+app.use('/api/master-prices', require('./routes/master-prices'));
+app.use('/api/vision',        require('./routes/vision'));
+app.use('/api/stock',         require('./routes/stock'));
+app.use('/api/materials',     require('./routes/materials'));
+app.use('/api/recipes',       require('./routes/recipes'));
+app.use('/api/clients',       require('./routes/clients'));
+app.use('/api/bundles',       require('./routes/bundles'));
+app.use('/api/bosses',        require('./routes/bosses'));
+app.use('/api/craft-log',     require('./routes/craft-log'));
+
+// Build version — changes every server restart/deploy
+const BUILD_VERSION = Date.now().toString();
+app.get('/api/version', (req, res) => res.json({ version: BUILD_VERSION }));
+
+// Logout endpoint — clears session so user must log in again after reload
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
+// Serve frontend
+app.use(express.static(path.join(__dirname, '../public')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// Start
+initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🔧 Mech Shop Manager running on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('DB init failed:', err);
+  process.exit(1);
+});
