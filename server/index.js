@@ -70,7 +70,13 @@ app.use('/api/bosses',        require('./routes/bosses'));
 app.use('/api/craft-log',     require('./routes/craft-log'));
 
 // Build version — changes every server restart/deploy
-const BUILD_VERSION = Date.now().toString();
+// Stable per-DEPLOYMENT version. On Vercel every function instance must report the
+// same value (Date.now() differs per cold start → false "new update" + forced logout).
+const BUILD_VERSION =
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.VERCEL_DEPLOYMENT_ID ||
+  process.env.BUILD_ID ||
+  Date.now().toString();
 app.get('/api/version', (req, res) => res.json({ version: BUILD_VERSION }));
 
 // Logout endpoint — clears session so user must log in again after reload

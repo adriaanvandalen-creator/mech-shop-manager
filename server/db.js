@@ -519,33 +519,63 @@ async function seedMasterPrices() {
 // ──────────────────────────────────────────────────────────────
 const SEED_SHOPS = [
   {
-    name:   'Los Santos Customs',          // ← confirm exact display name
+    name:   'Los Santos Customs',
     slug:   'los-santos-customs',
     emoji:  '🔧',
-    color:  '#1a6fd4',                     // primary (LSC blue)
-    color2: '#1558b0',                     // secondary
-    logoFile: 'lsc-logo.png',              // place in public/assets/
+    color:  '#1a6fd4', color2: '#1558b0',
+    logoFile: 'lsc-logo.png',
     pinEnv: 'LSC_BOSS_PIN',
+    workers: [['Mike','🔧','1111'],['Tony','⚙️','2222'],['Sofia','🛠️','3333']],
   },
   {
-    name:   'Redline',                     // ← confirm exact display name
+    name:   'Redline',
     slug:   'redline',
     emoji:  '🏁',
-    color:  '#ff3b30',                     // primary (red) — adjust to brand
-    color2: '#b61f17',                     // secondary (darker red)
-    logoFile: 'redline-logo.png',          // place in public/assets/
-    pinEnv: 'REDLINE_BOSS_PIN',            // set this env var to enable seeding
+    color:  '#e01f26', color2: '#a8161b',
+    logoFile: 'redline-logo.png',
+    pinEnv: 'REDLINE_BOSS_PIN',
+    workers: [['Ray','🔧','4444'],['Nina','⚙️','5555'],['Dex','🛠️','6666']],
   },
   {
-    name:   'Angels & Sons',               // ← confirm exact display name
+    name:   'Angels & Sons',
     slug:   'angels-and-sons',
     emoji:  '😇',
-    color:  '#4fa8e8',                     // primary — adjust to brand
-    color2: '#2f6fb0',                     // secondary
-    logoFile: 'angels-and-sons-logo.png',  // place in public/assets/
+    color:  '#c62828', color2: '#8e1f1f',
+    logoFile: 'angels-and-sons-logo.png',
     pinEnv: 'ANGELS_BOSS_PIN',
+    workers: [['Gabe','🔧','7777'],['Lena','⚙️','8888'],['Marco','🛠️','9999']],
   },
 ];
+
+// Seed a shop's workers (distinct PINs) + a few sample orders. Shared by the
+// production seeder below and used to self-heal shops that have no staff yet.
+async function seedShopStaff(shopId, workers) {
+  const w = [];
+  for (const [mn, ma, mpin] of workers) {
+    const h = await bcrypt.hash(mpin, 10);
+    const r = await pool.query(
+      'INSERT INTO mechanics (shop_id, name, avatar, pin, pin_plain) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+      [shopId, mn, ma, h, mpin]
+    );
+    w.push({ id: r.rows[0].id, name: mn });
+  }
+  const orders = [
+    ['Sultan RS','ABC123','Tony Marconi', w[0].id, w[0].name,'inprogress',450000],
+    ['Elegy RH8','RH8-99','Sarah Lin',    null,    null,      'pending',   120000],
+    ['Comet S2','FAST01','Deposit',       w[1].id, w[1].name,'pending',    600000],
+    ['Kuruma','KRM420','Big Mike',        w[2].id, w[2].name,'done',       80000],
+    ['Banshee','BAN777','Jade Cross',     w[0].id, w[0].name,'done',       200000],
+  ];
+  for (const [veh,plate,player,mid,mname,status,price] of orders) {
+    await pool.query(
+      `INSERT INTO orders (shop_id, vehicle, plate, player, mechanic_id, mechanic_name, status, price, parts, done_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [shopId, veh, plate, player, mid, mname, status, price,
+       JSON.stringify([{ name:'Full Stage 2', price }]),
+       status === 'done' ? new Date() : null]
+    );
+  }
+}
 
 // Read a logo file from public/assets and return it as a base64 data URL
 function loadLogoDataUrl(logoFile) {
@@ -569,26 +599,39 @@ async function seedShops() {
       console.log(`↷ Skipping seed for "${s.name}" — set ${s.pinEnv} to create it.`);
       continue;
     }
-    // Already created? Leave it alone.
-    const { rows } = await pool.query('SELECT id FROM shops WHERE slug=$1', [s.slug]);
-    if (rows.length) continue;
-
     const hash = await bcrypt.hash(pin, 10);
-    const logo = loadLogoDataUrl(s.logoFile);
-    const ins = await pool.query(
-      `INSERT INTO shops (name, slug, boss_pin, theme_color, theme_color2, logo_emoji, logo_image)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (slug) DO NOTHING
-       RETURNING id`,
-      [s.name, s.slug, hash, s.color, s.color2, s.emoji, logo]
-    );
-    if (!ins.rows.length) continue; // created concurrently
-    const shopId = ins.rows[0].id;
-    // a named boss (admin can see/change this PIN) + this shop's craftable parts, materials & recipes
-    await pool.query('INSERT INTO bosses (shop_id, name, avatar, pin, pin_plain) VALUES ($1,$2,$3,$4,$5)',
-      [shopId, 'Boss', '👑', hash, pin]);
-    await seedCrafting(shopId);
-    console.log(`✅ Seeded shop "${s.name}"${logo ? ' (with logo)' : ''} + boss + crafting`);
+    // Create the shop if it doesn't exist yet
+    let { rows } = await pool.query('SELECT id FROM shops WHERE slug=$1', [s.slug]);
+    let shopId;
+    if (rows.length) {
+      shopId = rows[0].id;
+    } else {
+      const logo = loadLogoDataUrl(s.logoFile);
+      const ins = await pool.query(
+        `INSERT INTO shops (name, slug, boss_pin, theme_color, theme_color2, logo_emoji, logo_image)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (slug) DO NOTHING
+         RETURNING id`,
+        [s.name, s.slug, hash, s.color, s.color2, s.emoji, logo]
+      );
+      if (!ins.rows.length) continue; // created concurrently
+      shopId = ins.rows[0].id;
+      await pool.query('INSERT INTO bosses (shop_id, name, avatar, pin, pin_plain) VALUES ($1,$2,$3,$4,$5)',
+        [shopId, 'Boss', '👑', hash, pin]);
+      console.log(`✅ Created shop "${s.name}"`);
+    }
+    // Self-heal: add this shop's workers + sample orders if it has none yet
+    const { rows: wc } = await pool.query('SELECT COUNT(*)::int AS n FROM mechanics WHERE shop_id=$1', [shopId]);
+    if (wc[0].n === 0 && s.workers && s.workers.length) {
+      await seedShopStaff(shopId, s.workers);
+      console.log(`  ↳ "${s.name}": added ${s.workers.length} workers + sample orders`);
+    }
+    // Self-heal: add craftable parts + recipes if none yet
+    const { rows: cc } = await pool.query('SELECT COUNT(*)::int AS n FROM stock_items WHERE shop_id=$1', [shopId]);
+    if (cc[0].n === 0) {
+      await seedCrafting(shopId);
+      console.log(`  ↳ "${s.name}": added crafting recipes`);
+    }
   }
 }
 
