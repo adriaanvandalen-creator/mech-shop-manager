@@ -775,12 +775,84 @@ select option{background:var(--card);color:var(--ink);}
 .role-card:hover,.role-card.selected{background:var(--paper2);border-color:var(--accent);}
 .role-card .rn{font-weight:600;}
 .server-monogram{background:var(--ink)!important;color:var(--paper)!important;border:none!important;border-radius:16px;font-family:var(--tight);}
+
+/* ════════════════════════════════════════════════════════════════
+   LOGIN SCREEN — GTA / neon-community landing (purple smoke · graffiti · glass)
+   ════════════════════════════════════════════════════════════════ */
+#login-screen{
+  background:
+    radial-gradient(55% 45% at 18% 104%, rgba(150,58,224,.30), transparent 70%),
+    radial-gradient(55% 45% at 82% 104%, rgba(176,74,236,.28), transparent 70%),
+    radial-gradient(85% 55% at 50% 118%, rgba(120,40,200,.34), transparent 70%),
+    linear-gradient(180deg,#ece7dd 0%,#e7e1d5 50%,#eadfe9 100%);
+  position:fixed;
+}
+#login-screen::before{display:none!important;}  /* drop the old top accent bar */
+.lr-scene{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none;}
+#login-screen > .login-logo,#login-screen > .login-card{position:relative;z-index:1;}
+
+/* giant faded graffiti words flanking the logo */
+.lr-graffiti{
+  position:absolute;top:6%;font-family:var(--tight);font-weight:800;font-style:italic;
+  font-size:clamp(54px,13.5vw,188px);line-height:1;letter-spacing:-.04em;text-transform:uppercase;
+  color:rgba(44,36,54,.11);white-space:nowrap;user-select:none;
+}
+.lr-left{left:1%;}
+.lr-right{right:1%;}
+
+/* purple angular corner shards */
+.lr-corner{position:absolute;width:clamp(92px,13vw,180px);height:clamp(92px,13vw,180px);
+  background:linear-gradient(135deg,#140a20 0%,#5e21ab 62%,#a862ff 100%);opacity:.95;}
+.lr-tl{top:0;left:0;clip-path:polygon(0 0,100% 0,0 100%);}
+.lr-tr{top:0;right:0;clip-path:polygon(100% 0,0 0,100% 100%);}
+.lr-bl{bottom:0;left:0;clip-path:polygon(0 100%,0 0,100% 100%);}
+.lr-br{bottom:0;right:0;clip-path:polygon(100% 100%,100% 0,0 100%);}
+
+/* glowing server logo + heading */
+.login-logo .server-logo{filter:drop-shadow(0 0 16px rgba(150,60,230,.6)) drop-shadow(0 0 42px rgba(120,40,200,.42));border-radius:20px;}
+.login-logo h1{text-shadow:0 2px 26px rgba(130,50,210,.25);}
+.login-logo .product-label span{color:#8a2be2;}
+
+/* glass shop-picker card */
+#login-screen .login-card{
+  background:rgba(255,255,255,.55);
+  backdrop-filter:blur(16px) saturate(1.15);
+  -webkit-backdrop-filter:blur(16px) saturate(1.15);
+  border:1px solid rgba(255,255,255,.75);
+  border-radius:22px;
+  box-shadow:0 0 0 1px rgba(150,60,230,.22),0 24px 64px -22px rgba(80,20,160,.55),inset 0 1px 0 rgba(255,255,255,.7);
+}
+#login-screen .login-card::before{display:none;}
+#login-screen .login-card h2{color:#3a2550;letter-spacing:.14em;}
+
+/* glassy shop rows */
+#login-screen .shop-item{
+  background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.85);border-radius:16px;
+  box-shadow:0 6px 16px -10px rgba(80,20,160,.4);transition:transform .14s var(--ease),box-shadow .14s var(--ease),background .14s var(--ease);
+}
+#login-screen .shop-item:hover{background:#fff;transform:translateY(-2px);box-shadow:0 0 0 1px rgba(150,60,230,.4),0 12px 24px -10px rgba(120,40,200,.55);}
+#login-screen .shop-item .shop-name{font-family:var(--tight);font-weight:650;}
+#login-screen .shop-item .shop-arrow{color:#8a2be2;}
+.shop-picker-logo,.shop-picker-fallback{background:#fff!important;border:1px solid var(--line);border-radius:10px;}
+
+/* register controls tinted to the neon accent */
+#login-screen .lbtn{background:linear-gradient(180deg,#8a2be2,#6a1fb8)!important;color:#fff!important;border:none!important;}
+#register-shop-hint{color:#5a4a6a!important;}
+@media(max-width:560px){ .lr-graffiti{font-size:clamp(42px,15vw,90px);top:4%;} .lr-corner{width:70px;height:70px;} }
 </style>
 </head>
 <body>
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
+  <div class="lr-scene" aria-hidden="true">
+    <span class="lr-graffiti lr-left">UNITY</span>
+    <span class="lr-graffiti lr-right">REJECTS</span>
+    <span class="lr-corner lr-tl"></span>
+    <span class="lr-corner lr-tr"></span>
+    <span class="lr-corner lr-bl"></span>
+    <span class="lr-corner lr-br"></span>
+  </div>
   <div class="login-logo" onclick="handleLogoCLick()">
     <img class="server-logo" src="/assets/unity-rejects-logo.png" alt="Unity Rejects server logo" onerror="this.hidden=true;document.getElementById('server-monogram').hidden=false"/>
     <div id="server-monogram" class="server-monogram" hidden>UR</div>
