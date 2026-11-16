@@ -15,9 +15,9 @@ if (!MEMORY_DB) {
     ssl: process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('railway.internal')
       ? false
       : { rejectUnauthorized: false },
-    max: 20,              // max simultaneous DB connections
+    max: process.env.VERCEL ? 1 : 20,  // serverless: 1 conn per function instance (use a pooled URL)
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000
+    connectionTimeoutMillis: 10000
   });
 } else {
   const { newDb, DataType } = require('pg-mem');

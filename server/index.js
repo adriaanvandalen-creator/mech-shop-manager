@@ -39,6 +39,18 @@ app.use(session({
   }
 }));
 
+// Ensure the DB schema + seed is ready before any API request.
+// Cached so it runs once per process (safe on Vercel serverless cold starts).
+let _dbReady = null;
+function ensureDb() {
+  if (!_dbReady) _dbReady = initDb().catch(err => { _dbReady = null; throw err; });
+  return _dbReady;
+}
+app.use('/api', async (req, res, next) => {
+  try { await ensureDb(); next(); }
+  catch (e) { console.error('DB init failed:', e && e.message); res.status(503).json({ error: 'Database starting up — please retry' }); }
+});
+
 // API Routes
 app.use('/api/shops',         require('./routes/shops'));
 app.use('/api/mechanics',     require('./routes/mechanics'));
@@ -72,12 +84,12 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Start
-initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🔧 Mech Shop Manager running on port ${PORT}`);
-  });
-}).catch(err => {
-  console.error('DB init failed:', err);
-  process.exit(1);
-});
+// Run a long-running server when executed directly (local / Railway / Render).
+// On Vercel this file is imported by api/index.js and exported as a serverless handler.
+if (require.main === module) {
+  ensureDb()
+    .then(() => app.listen(PORT, () => console.log(`🔧 Mech Shop Manager running on port ${PORT}`)))
+    .catch(err => { console.error('DB init failed:', err); process.exit(1); });
+}
+
+module.exports = app;
