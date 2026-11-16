@@ -28,7 +28,7 @@ app.set('trust proxy', 1);
 app.use(session({
   // Postgres-backed sessions normally; in-memory test mode uses the default store
   ...(MEMORY_DB ? {} : { store: new pgSession({ pool, createTableIfMissing: true }) }),
-  secret: process.env.SESSION_SECRET || 'lsc-secret-change-in-prod',
+  secret: process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
   cookie: {

@@ -64,10 +64,11 @@ router.post('/:shopId/login/boss', async (req, res) => {
   res.json({ role: 'boss', shopId: shop.id, shopName: shop.name, name: 'Boss' });
 });
 
-// Dev login — hidden, hardcoded, all-shop access
+// Dev login — hidden, all-shop access. Disabled unless DEV_PIN is set in the environment.
 router.post('/login/dev', async (req, res) => {
   const { pin } = req.body;
-  const DEV_PIN = process.env.DEV_PIN || 'LSCdev2026!';
+  const DEV_PIN = process.env.DEV_PIN;
+  if (!DEV_PIN) return res.status(403).json({ error: 'Dev login is disabled' });
   if (pin !== DEV_PIN) return res.status(401).json({ error: 'Wrong PIN' });
   const { rows } = await pool.query('SELECT id, name FROM shops ORDER BY name');
   req.session.user = { role: 'dev', name: '[DEV] Schalk', shops: rows };
