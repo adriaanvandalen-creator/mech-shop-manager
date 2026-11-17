@@ -24,8 +24,8 @@ router.post('/', async (req, res) => {
   const { vehicle, plate, player, mechanic_id, mechanic_name, price, parts, notes, client_type, tab_id } = req.body;
   const createdBy = (req.session.user && req.session.user.name) ? req.session.user.name : null;
   const { rows } = await pool.query(
-    `INSERT INTO orders (shop_id, vehicle, plate, player, mechanic_id, mechanic_name, price, parts, notes, client_type, tab_id, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    `INSERT INTO orders (shop_id, vehicle, plate, player, mechanic_id, mechanic_name, price, parts, notes, client_type, tab_id, created_by, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'inprogress') RETURNING *`,
     [req.shopId, vehicle, plate, player, mechanic_id || null, mechanic_name || '', price || 0,
      JSON.stringify(parts || []), notes || '', client_type || 'regular', tab_id || null, createdBy]
   );

@@ -71,7 +71,7 @@ async function initDb() {
       player      TEXT,
       mechanic_id INTEGER REFERENCES mechanics(id) ON DELETE SET NULL,
       mechanic_name TEXT,
-      status      TEXT DEFAULT 'pending',
+      status      TEXT DEFAULT 'inprogress',
       price       NUMERIC DEFAULT 0,
       parts       JSONB DEFAULT '[]',
       notes       TEXT,
@@ -365,14 +365,12 @@ async function seedCrafting(shopId) {
 // Boss PIN for every demo shop is 1234.
 async function seedDemoData() {
   const demoHash = await bcrypt.hash('1234', 10);
-  // Each shop has its OWN workers (distinct names + PINs) so staff are clearly shop-scoped.
+  // 3 shops, each with just a boss (PIN 1234) + crafting. No fake workers or
+  // sample orders — the boss creates real workers from the app.
   const shops = [
-    { name:'Los Santos Customs', slug:'los-santos-customs', emoji:'🔧', c1:'#1a6fd4', c2:'#1558b0', logo:'lsc-logo.png',
-      workers:[['Mike','🔧','1111'],['Tony','⚙️','2222'],['Sofia','🛠️','3333']] },
-    { name:'Redline', slug:'redline', emoji:'🏁', c1:'#e01f26', c2:'#a8161b', logo:'redline-logo.png',
-      workers:[['Ray','🔧','4444'],['Nina','⚙️','5555'],['Dex','🛠️','6666']] },
-    { name:'Angels & Sons', slug:'angels-and-sons', emoji:'😇', c1:'#c62828', c2:'#8e1f1f', logo:'angels-and-sons-logo.png',
-      workers:[['Gabe','🔧','7777'],['Lena','⚙️','8888'],['Marco','🛠️','9999']] },
+    { name:'Los Santos Customs', slug:'los-santos-customs', emoji:'🔧', c1:'#1a6fd4', c2:'#1558b0', logo:'lsc-logo.png' },
+    { name:'Redline', slug:'redline', emoji:'🏁', c1:'#e01f26', c2:'#a8161b', logo:'redline-logo.png' },
+    { name:'Angels & Sons', slug:'angels-and-sons', emoji:'😇', c1:'#c62828', c2:'#8e1f1f', logo:'angels-and-sons-logo.png' },
   ];
   for (const s of shops) {
     const logo = loadLogoDataUrl(s.logo);
@@ -385,35 +383,10 @@ async function seedDemoData() {
     // a named boss (PIN 1234, readable for admin)
     await pool.query('INSERT INTO bosses (shop_id, name, avatar, pin, pin_plain) VALUES ($1,$2,$3,$4,$5)',
       [shopId, 'Boss', '👑', demoHash, '1234']);
-    // this shop's own workers, each with their own PIN
-    const w = [];
-    for (const [mn, ma, mpin] of s.workers) {
-      const h = await bcrypt.hash(mpin, 10);
-      const r = await pool.query('INSERT INTO mechanics (shop_id, name, avatar, pin, pin_plain) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-        [shopId, mn, ma, h, mpin]);
-      w.push({ id: r.rows[0].id, name: mn });
-    }
-    // a few sample orders across the board columns, assigned to this shop's workers
-    const orders = [
-      ['Sultan RS','ABC123','Tony Marconi', w[0].id, w[0].name,'inprogress',450000],
-      ['Elegy RH8','RH8-99','Sarah Lin',    null,    null,      'pending',   120000],
-      ['Comet S2','FAST01','Deposit',       w[1].id, w[1].name,'pending',    600000],
-      ['Kuruma','KRM420','Big Mike',        w[2].id, w[2].name,'done',       80000],
-      ['Banshee','BAN777','Jade Cross',     w[0].id, w[0].name,'done',       200000],
-    ];
-    for (const [veh,plate,player,mid,mname,status,price] of orders) {
-      await pool.query(
-        `INSERT INTO orders (shop_id, vehicle, plate, player, mechanic_id, mechanic_name, status, price, parts, done_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [shopId, veh, plate, player, mid, mname, status, price,
-         JSON.stringify([{ name:'Full Stage 2', price }]),
-         status === 'done' ? new Date() : null]
-      );
-    }
     // materials + craftable parts + recipes for this shop
     await seedCrafting(shopId);
   }
-  console.log('✅ Seeded demo data (3 shops · boss PIN 1234 · distinct workers · crafting recipes)');
+  console.log('✅ Seeded 3 shops (boss PIN 1234 · crafting recipes · no test workers/orders)');
 }
 
 // Unity Rejects master pricelist — admin can edit/add via the app
@@ -525,7 +498,6 @@ const SEED_SHOPS = [
     color:  '#1a6fd4', color2: '#1558b0',
     logoFile: 'lsc-logo.png',
     pinEnv: 'LSC_BOSS_PIN',
-    workers: [['Mike','🔧','1111'],['Tony','⚙️','2222'],['Sofia','🛠️','3333']],
   },
   {
     name:   'Redline',
@@ -534,7 +506,6 @@ const SEED_SHOPS = [
     color:  '#e01f26', color2: '#a8161b',
     logoFile: 'redline-logo.png',
     pinEnv: 'REDLINE_BOSS_PIN',
-    workers: [['Ray','🔧','4444'],['Nina','⚙️','5555'],['Dex','🛠️','6666']],
   },
   {
     name:   'Angels & Sons',
@@ -543,39 +514,8 @@ const SEED_SHOPS = [
     color:  '#c62828', color2: '#8e1f1f',
     logoFile: 'angels-and-sons-logo.png',
     pinEnv: 'ANGELS_BOSS_PIN',
-    workers: [['Gabe','🔧','7777'],['Lena','⚙️','8888'],['Marco','🛠️','9999']],
   },
 ];
-
-// Seed a shop's workers (distinct PINs) + a few sample orders. Shared by the
-// production seeder below and used to self-heal shops that have no staff yet.
-async function seedShopStaff(shopId, workers) {
-  const w = [];
-  for (const [mn, ma, mpin] of workers) {
-    const h = await bcrypt.hash(mpin, 10);
-    const r = await pool.query(
-      'INSERT INTO mechanics (shop_id, name, avatar, pin, pin_plain) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-      [shopId, mn, ma, h, mpin]
-    );
-    w.push({ id: r.rows[0].id, name: mn });
-  }
-  const orders = [
-    ['Sultan RS','ABC123','Tony Marconi', w[0].id, w[0].name,'inprogress',450000],
-    ['Elegy RH8','RH8-99','Sarah Lin',    null,    null,      'pending',   120000],
-    ['Comet S2','FAST01','Deposit',       w[1].id, w[1].name,'pending',    600000],
-    ['Kuruma','KRM420','Big Mike',        w[2].id, w[2].name,'done',       80000],
-    ['Banshee','BAN777','Jade Cross',     w[0].id, w[0].name,'done',       200000],
-  ];
-  for (const [veh,plate,player,mid,mname,status,price] of orders) {
-    await pool.query(
-      `INSERT INTO orders (shop_id, vehicle, plate, player, mechanic_id, mechanic_name, status, price, parts, done_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [shopId, veh, plate, player, mid, mname, status, price,
-       JSON.stringify([{ name:'Full Stage 2', price }]),
-       status === 'done' ? new Date() : null]
-    );
-  }
-}
 
 // Read a logo file from public/assets and return it as a base64 data URL
 function loadLogoDataUrl(logoFile) {
@@ -619,12 +559,6 @@ async function seedShops() {
       await pool.query('INSERT INTO bosses (shop_id, name, avatar, pin, pin_plain) VALUES ($1,$2,$3,$4,$5)',
         [shopId, 'Boss', '👑', hash, pin]);
       console.log(`✅ Created shop "${s.name}"`);
-    }
-    // Self-heal: add this shop's workers + sample orders if it has none yet
-    const { rows: wc } = await pool.query('SELECT COUNT(*)::int AS n FROM mechanics WHERE shop_id=$1', [shopId]);
-    if (wc[0].n === 0 && s.workers && s.workers.length) {
-      await seedShopStaff(shopId, s.workers);
-      console.log(`  ↳ "${s.name}": added ${s.workers.length} workers + sample orders`);
     }
     // Self-heal: add craftable parts + recipes if none yet
     const { rows: cc } = await pool.query('SELECT COUNT(*)::int AS n FROM stock_items WHERE shop_id=$1', [shopId]);

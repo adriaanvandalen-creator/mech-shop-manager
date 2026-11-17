@@ -184,6 +184,7 @@ select option{background:var(--surface);}
 
 /* ── BOARD ── */
 .board-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.board-cols.board-cols-2{grid-template-columns:repeat(2,1fr);}
 .board-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
 .col-head{font-family:'Barlow Condensed',system-ui,sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
 .col-head::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;}
@@ -951,6 +952,15 @@ input:focus,select:focus,textarea:focus,.linput:focus{border-color:#8a2be2!impor
 #login-screen .shop-item .shop-arrow{color:#8a2be2!important;}
 .modal{background:rgba(253,251,249,.95)!important;}
 .modal-overlay{background:rgba(24,10,44,.5)!important;backdrop-filter:blur(3px);}
+
+/* ── mute the baked-in graffiti so loose page text stays readable (in-app only) ── */
+body.in-app::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(241,236,248,.82) 0%,rgba(241,236,248,.55) 180px,rgba(241,236,248,.46) 100%);}
+/* crisp headers + loose text over the photo */
+body.in-app .page-title{text-shadow:0 1px 2px rgba(255,255,255,.95),0 0 12px rgba(255,255,255,.7);}
+body.in-app .page-title + div,
+body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255,255,.9);}
+.week-tab{background:rgba(255,255,255,.78)!important;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
 </style>
 </head>
 <body>
@@ -1169,11 +1179,7 @@ input:focus,select:focus,textarea:focus,.linput:focus{border-color:#8a2be2!impor
           <button id="board-done-all" class="btn btn-outline btn-sm" onclick="setBoardDoneFilter('all')">All</button>
         </div>
       </div>
-      <div class="board-cols">
-        <div class="board-col">
-          <div class="col-head pending">Pending</div>
-          <div id="col-pending"></div>
-        </div>
+      <div class="board-cols board-cols-2">
         <div class="board-col">
           <div class="col-head inprogress">In Progress</div>
           <div id="col-inprogress"></div>
@@ -1842,6 +1848,19 @@ input:focus,select:focus,textarea:focus,.linput:focus{border-color:#8a2be2!impor
       <button class="btn btn-outline" style="flex:1" onclick="closeModal('tyre-modal')">Cancel</button>
       <button class="btn btn-outline" style="flex:1" onclick="skipTyrePick()">No Tyres</button>
       <button class="btn btn-primary" style="flex:2" onclick="confirmTyrePick()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- FULL STAGE BUILDER MODAL -->
+<div class="modal-overlay" id="fullstage-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-title" id="fullstage-title">Full Stage Build</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px" id="fullstage-sub">Pick the components for this build</div>
+    <div id="fullstage-sections" style="display:flex;flex-direction:column;gap:18px;max-height:58vh;overflow-y:auto;margin-bottom:18px;padding-right:4px"></div>
+    <div class="btn-row">
+      <button class="btn btn-outline" style="flex:1" onclick="closeModal('fullstage-modal')">Cancel</button>
+      <button class="btn btn-primary" style="flex:2" onclick="confirmFullStageBuilder()">Add to Order</button>
     </div>
   </div>
 </div>
@@ -2587,7 +2606,7 @@ function renderBoard() {
   if (btnDoneWeek) btnDoneWeek.className = boardDoneFilter === 'week' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
   if (btnDoneAll)  btnDoneAll.className  = boardDoneFilter === 'all'  ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
 
-  const cols = { pending: [], inprogress: [], done: [] };
+  const cols = { inprogress: [], done: [] };
   let myOrders = me.role === 'mechanic'
     ? orders.filter(o => o.mechanic_id === me.mechId)
     : orders;
@@ -2600,7 +2619,8 @@ function renderBoard() {
     });
   }
   myOrders.forEach(o => {
-    const st = o.status || 'pending';
+    // pending is retired — any non-done order lives in In Progress
+    const st = o.status === 'done' ? 'done' : 'inprogress';
     if (cols[st]) cols[st].push(o);
   });
   // Boss: filter done column to current week (Sat→Sat) unless 'all'
@@ -2608,7 +2628,7 @@ function renderBoard() {
     const weekStart = saturdayStart();
     cols.done = cols.done.filter(o => new Date(o.updated_at || o.created_at) >= weekStart);
   }
-  ['pending','inprogress','done'].forEach(st => {
+  ['inprogress','done'].forEach(st => {
     const el = document.getElementById('col-' + st);
     if (!el) return;
     if (!cols[st].length) { el.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;padding:8px">Empty</div>'; return; }
@@ -2737,10 +2757,7 @@ function openOrderDetail(id) {
   btns.push(`<button class="btn btn-outline" style="flex:1" onclick="closeModal('order-detail-modal')">Close</button>`);
 
   const isBossRole = me.role === 'boss' || me.role === 'admin' || me.role === 'dev';
-  if (o.status === 'pending' && (isBossRole || o.mechanic_id === me.mechId)) {
-    btns.push(`<button class="btn btn-primary" style="flex:1" onclick="setStatus('${o.id}','inprogress')">Start Job</button>`);
-  }
-  if (o.status === 'inprogress' && (isBossRole || o.mechanic_id === me.mechId)) {
+  if (o.status !== 'done' && (isBossRole || o.mechanic_id === me.mechId)) {
     btns.push(`<button class="btn btn-success" style="flex:1" onclick="setStatus('${o.id}','done')">Mark Complete</button>`);
   }
   const canEdit = isBossRole || (o.mechanic_id === me.mechId && o.status !== 'done');
@@ -3020,7 +3037,7 @@ function addSelectedPart() {
   const isTyreOnly = name.toLowerCase().includes('tyre') && !name.toLowerCase().includes('full stage');
   const isFullStage = name.toLowerCase().includes('full stage');
   if (isFullStage) {
-    openBundleChecklistModal(name, price, qty);
+    openFullStageBuilder(name, price, qty);
     return;
   }
   if (isTyreOnly) {
@@ -3081,6 +3098,130 @@ function addExtraPrompt() {
 function removeExtraPrompt(i) {
   stageConfig.extraPrompts.splice(i, 1);
   renderStageSettings();
+}
+
+// ── In-game item images (copied from ox_inventory) resolved by item name ──
+const FS_ITEM_IMG = '/assets/items/';
+function itemSlug(name) { return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
+// Prefer a stored data-URL image; otherwise derive /assets/items/<slug>.png
+function itemImgSrc(item) {
+  if (item && typeof item === 'object' && item.image) return item.image;
+  const name = typeof item === 'string' ? item : (item && item.name);
+  return FS_ITEM_IMG + itemSlug(name) + '.png';
+}
+// <img> that falls back to a 📦 box if no matching picture exists
+function itemImgTag(item, size, extraStyle = '') {
+  const src = itemImgSrc(item);
+  const fs = Math.round(size * 0.5);
+  return `<img src="${src}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'📦',style:'width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;font-size:${fs}px;background:var(--surface2);border-radius:8px;flex-shrink:0'}))" style="width:${size}px;height:${size}px;border-radius:8px;object-fit:contain;background:#1c2128;flex-shrink:0;${extraStyle}"/>`;
+}
+
+// ── Full Stage builder: one modal, image-card choices with None/Without ──
+// `deduct` = value removed from the full-stage price when the customer declines
+// that included component. Twin turbo is a priced add-on (added, not deducted).
+function fullStageSections(isStage3) {
+  const S = [
+    { key:'tyre', label:'Tyres', deduct: partPriceOf('Tyres', 50000), opts:[
+      { v:'Slick Tyres',      img:'slick_tyres',      label:'Slick' },
+      { v:'Semi Slick Tyres', img:'semi_slick_tyres', label:'Semi-Slick' },
+      { v:'Offroad Tyres',    img:'offroad_tyres',    label:'Offroad' },
+      { none:true, label:'None' },
+    ]},
+    { key:'brakes', label:'Brakes', deduct: partPriceOf('Ceramic Brakes', 80000), opts:[
+      { v:'Ceramic Brakes', img:'ceramic_brakes', label:'Ceramic' },
+      { none:true, label:'None' },
+    ]},
+    { key:'trans', label:'Transmission', deduct: partPriceOf('Transmission (AWD/RWD/FWD/Race/Drift)', 80000), opts:[
+      { v:'RWD Drivetrain', img:'rwd_drivetrain', label:'RWD' },
+      { v:'FWD Drivetrain', img:'fwd_drivetrain', label:'FWD' },
+      { v:'AWD Drivetrain', img:'awd_drivetrain', label:'AWD' },
+      { none:true, label:'None' },
+    ]},
+  ];
+  if (isStage3) {
+    S.push({ key:'turbo', label:'Stage 3 Turbo', deduct: partPriceOf('Stage 3 Turbo', 100000), opts:[
+      { v:'Stage 3 Turbo', img:'turbo_lvl_3', label:'With Turbo' },
+      { none:true, label:'Without' },
+    ]});
+    S.push({ key:'twin', label:'Twin Turbo', priced:true, opts:[
+      { v:'Twin Turbo', img:'twin_turbo', label:'With Twin Turbo' },
+      { none:true, label:'Without' },
+    ]});
+  }
+  return S;
+}
+// Look up a shop master-price by name; fall back to a default if not configured
+function partPriceOf(name, fallback) {
+  const mp = getAllParts().find(p => p.name.toLowerCase() === name.toLowerCase());
+  return mp ? (Number(mp.price) || 0) : fallback;
+}
+
+let _fsState = null;
+function openFullStageBuilder(partName, partPrice, partQty) {
+  const isStage3 = /stage\s*3/i.test(partName);
+  const sections = fullStageSections(isStage3);
+  const picks = {};
+  // Included components default ON (first option); priced add-ons (twin turbo) default OFF
+  sections.forEach(s => { picks[s.key] = s.priced ? s.opts.length - 1 : 0; });
+  _fsState = { partName, partPrice: parseFloat(partPrice) || 0, partQty: parseInt(partQty) || 1, isStage3, sections, picks };
+  document.getElementById('fullstage-title').textContent = partName;
+  document.getElementById('fullstage-sub').textContent = isStage3
+    ? 'Stage 3 build — choose tyres, brakes, drivetrain, turbo & twin turbo'
+    : 'Choose tyres, brakes and drivetrain for this build';
+  renderFullStageBuilder();
+  document.getElementById('fullstage-modal').classList.add('open');
+}
+
+function renderFullStageBuilder() {
+  const { sections, picks } = _fsState;
+  document.getElementById('fullstage-sections').innerHTML = sections.map(s => `
+    <div>
+      <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:8px">${s.label}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${s.opts.map((o,i) => {
+          const sel = picks[s.key] === i;
+          const art = o.none
+            ? `<div style="width:54px;height:54px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted);border:1px dashed var(--border)">∅</div>`
+            : `<img src="${FS_ITEM_IMG}${o.img}.png" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔧',style:'font-size:26px;width:54px;height:54px;display:flex;align-items:center;justify-content:center'}))" style="width:54px;height:54px;object-fit:contain"/>`;
+          return `<button type="button" onclick="fsPick('${s.key}',${i})"
+            style="min-width:94px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:7px;padding:11px 8px;border-radius:12px;border:2px solid ${sel?'var(--accent)':'var(--border)'};background:${sel?'rgba(232,144,10,.12)':'var(--surface2)'};cursor:pointer;color:${sel?'var(--accent)':'var(--text)'};font-size:11.5px;font-weight:700;text-align:center;transition:.12s">
+            ${art}<span>${o.label}</span></button>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function fsPick(key, idx) { _fsState.picks[key] = idx; renderFullStageBuilder(); }
+
+function confirmFullStageBuilder() {
+  const { partName, partPrice, partQty, sections, picks } = _fsState;
+  // base full-stage line carries the price
+  orderParts.push({ name: partName, price: partPrice, qty: partQty });
+  sections.forEach(s => {
+    const o = s.opts[picks[s.key]];
+    if (s.priced) {
+      // premium add-on (twin turbo) — add its master price when selected
+      if (o && !o.none && o.v) {
+        orderParts.push({ name: o.v, price: partPriceOf(o.v, 0), qty: partQty });
+      }
+      return;
+    }
+    if (o && o.none) {
+      // customer declined an included component → deduct its value
+      const d = s.deduct || 0;
+      if (d) orderParts.push({ name: 'No ' + s.label, price: -d, qty: partQty });
+    } else if (o && o.v) {
+      // included component — spec line at R0 (already covered by the stage price)
+      orderParts.push({ name: o.v, price: 0, qty: partQty });
+    }
+  });
+  closeModal('fullstage-modal');
+  selectedPart = null;
+  document.getElementById('part-search').value = '';
+  document.getElementById('part-qty').value = '1';
+  document.getElementById('part-dropdown').style.display = 'none';
+  renderPartsDisplay();
+  recalcOrderTotal();
 }
 
 function openTransModal(partName, partPrice, partQty, pendingTyreType) {
@@ -3397,12 +3538,17 @@ function removePart(idx) {
 function renderPartsDisplay() {
   const el = document.getElementById('parts-display');
   if (!orderParts.length) { el.innerHTML = ''; return; }
-  el.innerHTML = orderParts.map((p, i) => `
-    <div class="part-row">
+  el.innerHTML = orderParts.map((p, i) => {
+    const amt = (p.price||0)*(p.qty||1);
+    const priceHtml = amt < 0
+      ? `<span class="part-price" style="color:var(--red)">−R${Math.abs(amt).toLocaleString()}</span>`
+      : `<span class="part-price">R${amt.toLocaleString()}</span>`;
+    return `<div class="part-row">
       <span class="part-name">${p.name} ×${p.qty||1}</span>
-      <span class="part-price">R${((p.price||0)*(p.qty||1)).toLocaleString()}</span>
+      ${priceHtml}
       <button class="part-del" onclick="removePart(${i})">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function recalcOrderTotal() {
@@ -3685,10 +3831,9 @@ function renderWeeklySummary() {
     const name = mech ? mech.name : (o.mechanic_name || 'Unassigned');
     const avatar = mech ? (mech.avatar || '🔧') : '❓';
     const key = o.mechanic_id != null ? o.mechanic_id : (o.mechanic_name || 'unassigned');
-    if (!mechMap[key]) mechMap[key] = { name, avatar, total: 0, done: 0, pending: 0, inprogress: 0 };
+    if (!mechMap[key]) mechMap[key] = { name, avatar, total: 0, done: 0, inprogress: 0 };
     if (o.status === 'done') { mechMap[key].total += parseFloat(o.price) || 0; mechMap[key].done++; }
-    else if (o.status === 'inprogress') mechMap[key].inprogress++;
-    else mechMap[key].pending++;
+    else mechMap[key].inprogress++; // pending retired — non-done counts as in progress
   });
 
   const mechRows = Object.values(mechMap).sort((a,b) => b.total - a.total);
@@ -3715,18 +3860,14 @@ function renderWeeklySummary() {
     </div>
 
     <!-- Orders stats row -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:24px">
       <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
         <div style="font-size:22px;font-weight:800;color:var(--green)">${doneOrders.length}</div>
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Completed</div>
       </div>
       <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:#4fa8e8">${weekOrders.filter(o=>o.status==='inprogress').length}</div>
+        <div style="font-size:22px;font-weight:800;color:#4fa8e8">${weekOrders.filter(o=>o.status!=='done').length}</div>
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">In Progress</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:var(--accent)">${weekOrders.filter(o=>o.status==='pending').length}</div>
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Pending</div>
       </div>
     </div>
 
@@ -3740,7 +3881,6 @@ function renderWeeklySummary() {
           <div style="font-size:11px;color:var(--muted);margin-top:2px">
             ✅ ${m.done} done
             ${m.inprogress ? `· 🔧 ${m.inprogress} in progress` : ''}
-            ${m.pending ? `· ⏳ ${m.pending} pending` : ''}
           </div>
         </div>
         <div style="text-align:right">
@@ -3768,10 +3908,9 @@ function exportWeeklySummaryPDF() {
     const name = mech ? mech.name : (o.mechanic_name || 'Unassigned');
     const avatar = mech ? (mech.avatar||'🔧') : '❓';
     const key = o.mechanic_id != null ? o.mechanic_id : (o.mechanic_name || 'unassigned');
-    if (!mechMap[key]) mechMap[key] = { name, avatar, total:0, done:0, pending:0, inprogress:0 };
+    if (!mechMap[key]) mechMap[key] = { name, avatar, total:0, done:0, inprogress:0 };
     if (o.status==='done') { mechMap[key].total += parseFloat(o.price)||0; mechMap[key].done++; }
-    else if (o.status==='inprogress') mechMap[key].inprogress++;
-    else mechMap[key].pending++;
+    else mechMap[key].inprogress++; // pending retired
   });
   const mechRows = Object.values(mechMap).sort((a,b)=>b.total-a.total);
 
@@ -3779,7 +3918,6 @@ function exportWeeklySummaryPDF() {
     <td>${m.avatar} ${m.name}</td>
     <td style="text-align:center;color:#2dbe6c;font-weight:700">${m.done}</td>
     <td style="text-align:center;color:#4fa8e8">${m.inprogress}</td>
-    <td style="text-align:center;color:#e8900a">${m.pending}</td>
     <td style="text-align:right;font-weight:800;font-size:15px;color:#1a7a40">R${m.total.toLocaleString()}</td>
   </tr>`).join('');
 
@@ -3816,14 +3954,13 @@ tfoot td{background:#f0f0f0;font-weight:700;border-top:2px solid #ddd;}
 </div>
 <div class="stats">
   <div class="stat"><div class="stat-val green">${doneOrders.length}</div><div class="stat-lbl">Completed</div></div>
-  <div class="stat"><div class="stat-val blue">${weekOrders.filter(o=>o.status==='inprogress').length}</div><div class="stat-lbl">In Progress</div></div>
-  <div class="stat"><div class="stat-val">${weekOrders.filter(o=>o.status==='pending').length}</div><div class="stat-lbl">Pending</div></div>
+  <div class="stat"><div class="stat-val blue">${weekOrders.filter(o=>o.status!=='done').length}</div><div class="stat-lbl">In Progress</div></div>
 </div>
 <h2>Mechanic Breakdown</h2>
 <table>
-  <thead><tr><th>Mechanic</th><th style="text-align:center">Completed</th><th style="text-align:center">In Progress</th><th style="text-align:center">Pending</th><th style="text-align:right">Earned</th></tr></thead>
-  <tbody>${rows.length ? rows : '<tr><td colspan="5" style="text-align:center;color:#999;padding:16px">No orders this week</td></tr>'}</tbody>
-  <tfoot><tr><td colspan="4" style="text-align:right">TOTAL</td><td style="text-align:right;font-size:14px;color:#1a7a40">R${shopTotal.toLocaleString()}</td></tr></tfoot>
+  <thead><tr><th>Mechanic</th><th style="text-align:center">Completed</th><th style="text-align:center">In Progress</th><th style="text-align:right">Earned</th></tr></thead>
+  <tbody>${rows.length ? rows : '<tr><td colspan="4" style="text-align:center;color:#999;padding:16px">No orders this week</td></tr>'}</tbody>
+  <tfoot><tr><td colspan="3" style="text-align:right">TOTAL</td><td style="text-align:right;font-size:14px;color:#1a7a40">R${shopTotal.toLocaleString()}</td></tr></tfoot>
 </table>
 <div class="footer"><span>Generated by Mech Manager · ${shopName}</span><span>${new Date().toLocaleString('en-ZA')}</span></div>
 <script>window.onload=()=>{window.print();}<\/script>
@@ -4407,6 +4544,7 @@ function renderMaterials() {
   el.innerHTML = `<div class="material-grid">${materialItems.map(m => {
     const isLow = m.quantity <= (m.low_threshold || 10);
     return `<div class="material-card${isLow ? ' low-stock' : ''}" onclick="openAdjustMaterial('${m.id}')">
+      <div style="display:flex;justify-content:center;margin-bottom:8px">${itemImgTag(m, 46)}</div>
       <div class="material-card-name">${m.name}</div>
       <div class="material-card-qty${isLow ? ' low' : ''}">${m.quantity}</div>
       <div class="material-card-unit">${m.unit || 'units'}</div>
@@ -4666,7 +4804,7 @@ function renderStock() {
     </div>` : '';
   el.innerHTML = valueBanner + `<div class="stock-grid">${stockItems.map(s => `
     <div class="stock-card" onclick="openAdjustStock('${s.id}')">
-      ${s.image ? `<img class="stock-card-img" src="${s.image}" alt="${s.name}"/>` : `<div class="stock-card-img-placeholder">📦</div>`}
+      <img class="stock-card-img" src="${itemImgSrc(s)}" alt="${s.name}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'stock-card-img-placeholder',textContent:'📦'}))"/>
       <div class="stock-card-name">${s.name}</div>
       <div class="stock-card-qty${s.quantity <= 5 ? ' low' : ''}">${s.quantity}x</div>
       ${s.price ? `<div class="stock-card-price">R${Number(s.price).toLocaleString()} each</div>` : ''}
@@ -5227,7 +5365,7 @@ function renderCraftPage() {
           return `<div class="card">
             <!-- Item header -->
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-              ${s.image ? `<img src="${s.image}" style="width:44px;height:44px;border-radius:8px;object-fit:contain;background:#1c2128;flex-shrink:0"/>` : `<div style="width:44px;height:44px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📦</div>`}
+              ${itemImgTag(s, 44)}
               <div style="flex:1;min-width:0">
                 <div style="font-family:'Barlow Condensed';font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">${s.name}</div>
                 <div style="font-size:11px;color:var(--muted)">R${Number(s.price||0).toLocaleString()} · ${ings.length} ingredient${ings.length!==1?'s':''}</div>
@@ -5319,7 +5457,7 @@ function renderCraftPage() {
       return `<div class="card" style="padding:0;overflow:hidden">
         <!-- Collapsed header (always visible) -->
         <button onclick="toggleCraftAccordion('${r.id}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text);cursor:pointer;text-align:left">
-          ${r.image ? `<img src="${r.image}" style="width:38px;height:38px;border-radius:7px;object-fit:contain;background:#1c2128;flex-shrink:0"/>` : `<div style="width:38px;height:38px;background:var(--surface2);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📦</div>`}
+          ${itemImgTag(r, 38)}
           <div style="flex:1;min-width:0">
             <div style="font-family:'Barlow Condensed';font-size:17px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
             <div style="display:flex;gap:6px;align-items:center;margin-top:2px;flex-wrap:wrap">
@@ -7024,10 +7162,9 @@ function exportDaySummaryPDF() {
     const name   = mech ? mech.name   : (o.mechanic_name || 'Unassigned');
     const avatar = mech ? (mech.avatar||'🔧') : '❓';
     const key = o.mechanic_id != null ? o.mechanic_id : (o.mechanic_name || 'unassigned');
-    if (!mechMap[key]) mechMap[key] = { name, avatar, total:0, done:0, pending:0, inprogress:0 };
+    if (!mechMap[key]) mechMap[key] = { name, avatar, total:0, done:0, inprogress:0 };
     if (o.status==='done') { mechMap[key].total += parseFloat(o.price)||0; mechMap[key].done++; }
-    else if (o.status==='inprogress') mechMap[key].inprogress++;
-    else mechMap[key].pending++;
+    else mechMap[key].inprogress++; // pending retired
   });
   const mechRows = Object.values(mechMap).sort((a,b)=>b.total-a.total);
 
@@ -7035,8 +7172,7 @@ function exportDaySummaryPDF() {
     <td>${m.avatar} ${m.name}</td>
     <td style="text-align:center;color:#2dbe6c;font-weight:700">${m.done}</td>
     <td style="text-align:center;color:#4fa8e8">${m.inprogress}</td>
-    <td style="text-align:center;color:#e8900a">${m.pending}</td>
-    <td style="text-align:center;font-weight:700">${m.done + m.inprogress + m.pending}</td>
+    <td style="text-align:center;font-weight:700">${m.done + m.inprogress}</td>
   </tr>`).join('');
 
   const orderRows = doneOrders.map(o => {
@@ -7080,14 +7216,13 @@ tfoot td{background:#f0f0f0;font-weight:700;border-top:2px solid #ddd;}
 </div>
 <div class="stats">
   <div class="stat"><div class="stat-val green">${doneOrders.length}</div><div class="stat-lbl">Completed</div></div>
-  <div class="stat"><div class="stat-val blue">${dayOrders.filter(o=>o.status==='inprogress').length}</div><div class="stat-lbl">In Progress</div></div>
-  <div class="stat"><div class="stat-val">${dayOrders.filter(o=>o.status==='pending').length}</div><div class="stat-lbl">Pending</div></div>
+  <div class="stat"><div class="stat-val blue">${dayOrders.filter(o=>o.status!=='done').length}</div><div class="stat-lbl">In Progress</div></div>
 </div>
 <h2>Mechanic Breakdown</h2>
 <table>
-  <thead><tr><th>Mechanic</th><th style="text-align:center">Done</th><th style="text-align:center">In Progress</th><th style="text-align:center">Pending</th><th style="text-align:center">Total</th></tr></thead>
-  <tbody>${rows||'<tr><td colspan="5" style="text-align:center;color:#999;padding:12px">No orders</td></tr>'}</tbody>
-  <tfoot><tr><td colspan="4" style="text-align:right">TOTAL JOBS</td><td style="text-align:center">${dayOrders.length}</td></tr></tfoot>
+  <thead><tr><th>Mechanic</th><th style="text-align:center">Done</th><th style="text-align:center">In Progress</th><th style="text-align:center">Total</th></tr></thead>
+  <tbody>${rows||'<tr><td colspan="4" style="text-align:center;color:#999;padding:12px">No orders</td></tr>'}</tbody>
+  <tfoot><tr><td colspan="3" style="text-align:right">TOTAL JOBS</td><td style="text-align:center">${dayOrders.length}</td></tr></tfoot>
 </table>
 <h2>Completed Orders</h2>
 <table>
