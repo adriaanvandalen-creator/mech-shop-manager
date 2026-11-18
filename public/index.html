@@ -912,13 +912,8 @@ body{background:#1b1030 url('/assets/bg.png') center center / cover no-repeat fi
 #login-screen .login-logo{display:none!important;}
 #login-screen .login-card{margin-top:11vh;}
 @media(max-height:760px){ #login-screen .login-card{margin-top:4vh;} }
-.lr-watermark{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.72);text-shadow:0 1px 10px rgba(30,10,60,.7);pointer-events:none;z-index:1;}
-/* global watermark on every in-app page (login keeps its own .lr-watermark) */
-#app-watermark{position:fixed;left:0;right:0;bottom:8px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(70,45,110,.6);text-shadow:0 1px 8px rgba(255,255,255,.55);pointer-events:none;z-index:40;display:none;}
-body.in-app #app-watermark{display:block;}
 /* elements only bosses/admins may use — hidden for mechanics */
 body.role-mechanic .boss-only{display:none!important;}
-@media(max-width:768px){ #app-watermark{bottom:92px;} }
 /* cookie consent */
 #cookie-consent{position:fixed;left:16px;right:16px;bottom:16px;z-index:100000;max-width:560px;margin:0 auto;display:none;
   background:rgba(22,12,40,.94);color:#efe6ff;border:1px solid rgba(160,90,240,.5);border-radius:14px;
@@ -999,8 +994,6 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
   <span class="scene-corner sc-br"></span>
 </div>
 
-<!-- Global watermark — shows on every page -->
-<div id="app-watermark" aria-hidden="true">Created by Frikkie Botha</div>
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
@@ -1121,7 +1114,6 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
     <button class="btn btn-outline btn-full" style="padding:12px" onclick="backToShops()">Back</button>
   </div>
 
-  <div class="lr-watermark">Created by Frikkie Botha</div>
 </div>
 
 <!-- MAIN APP -->
