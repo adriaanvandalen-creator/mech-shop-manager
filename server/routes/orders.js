@@ -5,6 +5,42 @@ const { requireBoss, injectShop } = require('../middleware/auth');
 
 router.use(injectShop);
 
+// Map an order part label → the crafted stock item it consumes. Full-stage parts
+// (Slick Tyres, Ceramic Brakes, AWD Drivetrain, Twin Turbo…) already match stock
+// names directly; these aliases cover the JG tablet category labels.
+const STOCK_ALIASES = {
+  'headlights': 'lighting controller', 'neon lights': 'lighting controller', 'xenon headlights': 'lighting controller',
+  'cosmetics': 'cosmetic part', 'body kit': 'cosmetic part',
+  'respray': 'respray kit', 'wheels': 'vehicle wheels', 'vehicle wheels set': 'vehicle wheels',
+  'extras': 'extras kit', 'stance': 'stancing kit', 'repair': 'repair kit',
+  'tyre smoke': 'tyre smoke kit', 'nitrous': 'nitrous bottle', 'nos': 'nitrous bottle',
+  'performance': 'performance part',
+  'stage 1 turbo': 'turbo lvl 1', 'stage 2 turbo': 'turbo lvl 2', 'stage 3 turbo': 'turbo lvl 3',
+  'turbocharging': 'turbo lvl 3', 'turbo charger': 'turbo lvl 3',
+};
+
+// Subtract the parts used on an order from the shop's crafted stock (floors at 0).
+async function deductStockForParts(shopId, parts) {
+  if (!Array.isArray(parts) || !parts.length) return;
+  const { rows: stock } = await pool.query('SELECT id, name FROM stock_items WHERE shop_id=$1', [shopId]);
+  const byName = {};
+  stock.forEach(s => { byName[s.name.trim().toLowerCase()] = s.id; });
+  for (const p of parts) {
+    if (!p || !p.name) continue;
+    if ((Number(p.price) || 0) < 0) continue;            // skip "No Brakes" deduction lines
+    const qty = Math.max(1, parseInt(p.qty) || 1);
+    const key = p.name.trim().toLowerCase();
+    const target = STOCK_ALIASES[key] || key;            // alias → else match by same name
+    const stockId = byName[target];
+    if (!stockId) continue;                               // not a tracked stock item → skip
+    // NB: pg-mem miscomputes "quantity - $1"; add a negative delta instead (commutative, safe)
+    await pool.query(
+      'UPDATE stock_items SET quantity = GREATEST(0, quantity + $1) WHERE id=$2 AND shop_id=$3',
+      [-qty, stockId, shopId]
+    );
+  }
+}
+
 // List orders — mechanics only see their own
 router.get('/', async (req, res) => {
   let query, params;
@@ -23,13 +59,16 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { vehicle, plate, player, mechanic_id, mechanic_name, price, parts, notes, client_type, tab_id } = req.body;
   const createdBy = (req.session.user && req.session.user.name) ? req.session.user.name : null;
+  // Orders are logged after the work is done — a saved order is immediately Completed.
   const { rows } = await pool.query(
-    `INSERT INTO orders (shop_id, vehicle, plate, player, mechanic_id, mechanic_name, price, parts, notes, client_type, tab_id, created_by, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'inprogress') RETURNING *`,
+    `INSERT INTO orders (shop_id, vehicle, plate, player, mechanic_id, mechanic_name, price, parts, notes, client_type, tab_id, created_by, status, done_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'done',NOW()) RETURNING *`,
     [req.shopId, vehicle, plate, player, mechanic_id || null, mechanic_name || '', price || 0,
      JSON.stringify(parts || []), notes || '', client_type || 'regular', tab_id || null, createdBy]
   );
   const o = rows[0];
+  // Deduct the parts used on this order from the shop's crafted stock
+  try { await deductStockForParts(req.shopId, parts || []); } catch (e) { console.error('stock deduct failed:', e.message); }
   // Auto-charge tab account when client_type is tab
   if (client_type === 'tab' && tab_id && price > 0) {
     await pool.query(

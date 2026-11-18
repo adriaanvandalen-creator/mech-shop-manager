@@ -65,6 +65,7 @@ app.use('/api/clients',       require('./routes/clients'));
 app.use('/api/bundles',       require('./routes/bundles'));
 app.use('/api/bosses',        require('./routes/bosses'));
 app.use('/api/craft-log',     require('./routes/craft-log'));
+app.use('/api/boxes',         require('./routes/boxes'));
 
 // Build version — changes every server restart/deploy
 // Stable per-DEPLOYMENT version. On Vercel every function instance must report the

@@ -916,6 +916,8 @@ body{background:#1b1030 url('/assets/bg.png') center center / cover no-repeat fi
 /* global watermark on every in-app page (login keeps its own .lr-watermark) */
 #app-watermark{position:fixed;left:0;right:0;bottom:8px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(70,45,110,.6);text-shadow:0 1px 8px rgba(255,255,255,.55);pointer-events:none;z-index:40;display:none;}
 body.in-app #app-watermark{display:block;}
+/* elements only bosses/admins may use — hidden for mechanics */
+body.role-mechanic .boss-only{display:none!important;}
 @media(max-width:768px){ #app-watermark{bottom:92px;} }
 /* cookie consent */
 #cookie-consent{position:fixed;left:16px;right:16px;bottom:16px;z-index:100000;max-width:560px;margin:0 auto;display:none;
@@ -1239,6 +1241,19 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
       <div id="pay-list"></div>
     </div>
 
+    <!-- MY EARNINGS (worker) -->
+    <div class="page" id="page-earnings">
+      <div class="page-title"><span>Earnings</span></div>
+      <div style="font-size:12px;color:var(--muted);margin:-10px 0 16px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em">Money you brought the shop · completed jobs only</div>
+      <div id="earnings-content"></div>
+    </div>
+
+    <!-- BOXES -->
+    <div class="page" id="page-boxes">
+      <div class="page-title"><span>Boxes</span></div>
+      <div id="boxes-content"></div>
+    </div>
+
     <!-- TABS -->
     <div class="page" id="page-tabs">
       <div class="page-title">
@@ -1264,7 +1279,7 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
       <div class="page-title">
         <span>Crafted Stock</span>
         <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-outline btn-sm" onclick="exportStockPDF()">⬇ Export</button>
+          <button class="btn btn-outline btn-sm boss-only" onclick="exportStockPDF()">⬇ Export</button>
           <button class="btn btn-outline btn-sm" id="scan-stock-btn" onclick="triggerStockScan()" style="display:none">📷 Scan</button>
           <button class="btn btn-primary btn-sm" id="add-stock-btn" onclick="openAddStockModal()" style="display:none">+ Add Item</button>
         </div>
@@ -1278,7 +1293,7 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
       <div class="page-title">
         <span>Materials</span>
         <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-outline btn-sm" onclick="exportMaterialsPDF()">⬇ Export</button>
+          <button class="btn btn-outline btn-sm boss-only" onclick="exportMaterialsPDF()">⬇ Export</button>
           <button class="btn btn-outline btn-sm" id="mat-contrib-btn" onclick="openMaterialContributions()" style="display:none">📊 Contributions</button>
           <button class="btn btn-outline btn-sm" id="scan-material-btn" onclick="triggerMaterialScan()" style="display:none">📷 Scan</button>
           <button class="btn btn-primary btn-sm" id="add-material-btn" onclick="openAddMaterialModal()" style="display:none">+ Add Material</button>
@@ -1361,6 +1376,12 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
       <div class="card mb-3">
         <div class="card-title">Online Now</div>
         <div id="admin-online-mechs"><div class="empty">No mechanics clocked in</div></div>
+      </div>
+
+      <!-- REVENUE PER SHOP — this week + this month -->
+      <div class="card mb-3">
+        <div class="card-title">Revenue per shop</div>
+        <div id="admin-revenue"><div class="empty">Loading…</div></div>
       </div>
 
       <!-- ALL SHOPS — bosses + workers for every shop on one page -->
@@ -1543,19 +1564,19 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
     <div class="modal-title" id="order-modal-title">New Work Order</div>
     <!-- Photo scan -->
     <div style="margin-bottom:12px">
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">📸 Scan FiveM screenshot (auto-fills fields)</label>
-      <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">📸 Scan FiveM screenshot — upload or paste (Ctrl+V)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label for="o-photo-upload" class="btn btn-outline btn-sm" style="cursor:pointer;margin:0">📷 Upload Screenshot</label>
+        <span style="font-size:11px;color:var(--muted)">or press Ctrl+V to paste</span>
         <input type="file" id="o-photo-upload" accept="image/*" capture="environment" style="display:none" onchange="scanWorkOrder(this)"/>
-        <span id="scan-status" style="font-size:12px;color:var(--muted)"></span>
+        <span id="scan-status" style="font-size:12px;color:var(--muted);width:100%"></span>
       </div>
     </div>
-    <div class="fg-row">
-      <div class="fg"><label>Vehicle</label><input id="o-vehicle" placeholder="e.g. Sultan RS"/></div>
-      <div class="fg"><label>Plate</label><input id="o-plate" placeholder="e.g. ABC123"/></div>
-    </div>
+    <!-- vehicle & plate removed from the form; kept as hidden fields so existing logic still works -->
+    <input type="hidden" id="o-vehicle"/>
+    <input type="hidden" id="o-plate"/>
     <div class="fg" style="position:relative">
-      <label>Player Name <span style="color:#e8300a;font-size:11px">*</span></label>
+      <label>Client Name <span style="color:#e8300a;font-size:11px">*</span></label>
       <input id="o-player" placeholder="Character name" autocomplete="off"
         oninput="clientSearch(this.value)" onblur="setTimeout(()=>closeClientDD(),200)"/>
       <div id="client-dropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface2);border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);z-index:200;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)"></div>
@@ -1880,6 +1901,9 @@ body.in-app .section-sub,.page-sub,.week-tabs{text-shadow:0 1px 2px rgba(255,255
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Tesseract.js — 100% free, in-browser OCR (no API key, no server cost) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 
 <script>
 // ══════════════════════════════════════════
@@ -2310,6 +2334,7 @@ function enterApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('active');
   document.body.classList.add('in-app');
+  document.body.classList.toggle('role-mechanic', me.role === 'mechanic');
 
   const shopName = me.shopName || 'MECH MANAGER';
   const userLabel = me.role === 'dev' ? '⚡ Dev' : me.role === 'admin' ? '🛡️ Admin' : me.role === 'boss' ? `👑 ${me.name||'Boss'}` : `${me.avatar || '🔧'} ${me.name}`;
@@ -2342,6 +2367,7 @@ function enterApp() {
       {page:'tabs', icon:'receipt', label:'Accounts'},
       {page:'payroll', icon:'clock', label:'Hours'},
       {page:'weekly', icon:'chart', label:'Weekly'},
+      {page:'boxes', icon:'package', label:'Boxes'},
       {page:'clients', icon:'user', label:'Clients'},
       {page:'stock', icon:'package', label:'Stock'},
       {page:'materials', icon:'layers', label:'Materials'},
@@ -2380,7 +2406,9 @@ function enterApp() {
     navItems = [
       {page:'board', icon:'board', label:'Board'},
       {page:'orders', icon:'wrench', label:'My Jobs'},
+      {page:'earnings', icon:'dollar', label:'Earnings'},
       {page:'pay', icon:'clock', label:'My Hours'},
+      {page:'boxes', icon:'package', label:'Boxes'},
       {page:'stock', icon:'package', label:'Stock'},
       {page:'materials', icon:'layers', label:'Materials'},
       {page:'craft', icon:'hammer', label:'Crafting'},
@@ -2477,7 +2505,195 @@ function nav(page, btn) {
   if (page === 'craft') renderCraftPage();
   if (page === 'clients') renderClientsList();
   if (page === 'weekly') renderWeeklySummary();
+  if (page === 'earnings') renderEarnings();
+  if (page === 'boxes') renderBoxes();
   if (page === 'settings' && (me.role === 'boss' || me.role === 'dev')) loadBossAccounts();
+}
+
+// ══════════════════════════════════════════
+//  MONTH / WEEK helpers + MECHANIC EARNINGS
+// ══════════════════════════════════════════
+function getMonthBounds(offset = 0) {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1);
+  return { start, end };
+}
+function sumDoneOrders(list, start, end) {
+  return list.filter(o => {
+    if (o.status !== 'done') return false;
+    const d = new Date(o.done_at || o.updated_at || o.created_at);
+    return d >= start && d < end;
+  }).reduce((s, o) => s + (parseFloat(o.price) || 0), 0);
+}
+function renderEarnings() {
+  const el = document.getElementById('earnings-content');
+  if (!el) return;
+  const mine = orders.filter(o => o.mechanic_id === me.mechId);
+  const thisWeek = getWeekBounds(0), lastWeek = getWeekBounds(1), thisMonth = getMonthBounds(0);
+  const wk = sumDoneOrders(mine, thisWeek.start, thisWeek.end);
+  const lw = sumDoneOrders(mine, lastWeek.start, lastWeek.end);
+  const mo = sumDoneOrders(mine, thisMonth.start, thisMonth.end);
+  const doneCount = mine.filter(o => o.status === 'done').length;
+  const card = (label, val, accent) => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center">
+      <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:8px">${label}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;color:${accent}">R${val.toLocaleString()}</div>
+    </div>`;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">
+      ${card('This Week', wk, 'var(--green)')}
+      ${card('Last Week', lw, 'var(--blue)')}
+      ${card('This Month', mo, 'var(--accent)')}
+    </div>
+    <div class="card"><div style="font-size:13px;color:var(--muted)">Based on <strong style="color:var(--text)">${doneCount}</strong> completed job${doneCount!==1?'s':''} assigned to you. Only jobs marked <strong style="color:var(--green)">Done</strong> count toward earnings.</div></div>`;
+}
+
+// ══════════════════════════════════════════
+//  BOXES (recyclable material hand-ins)
+// ══════════════════════════════════════════
+const BOX_IMG = '/assets/items/recyclablematerial.png';
+let boxesData = null;
+async function loadBoxes() { try { boxesData = await GET('/boxes'); } catch(e) { boxesData = null; } }
+async function renderBoxes() {
+  await loadBoxes();
+  const el = document.getElementById('boxes-content');
+  if (!el) return;
+  if (!boxesData) { el.innerHTML = '<div class="empty">Couldn\'t load boxes.</div>'; return; }
+  const isBoss = me.role === 'boss' || me.role === 'admin' || me.role === 'dev';
+  const d = boxesData;
+  const r = d.reminder || {};
+  const periodWord = r.period === 'month' ? 'this month' : 'this week';
+  const boxImg = `<img src="${BOX_IMG}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'📦',style:'font-size:40px'}))" style="width:64px;height:64px;object-fit:contain"/>`;
+
+  // shared: shop total card
+  const totalCard = `
+    <div class="card mb-3" style="display:flex;align-items:center;gap:16px">
+      ${boxImg}
+      <div style="flex:1">
+        <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)">Shop boxes</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:800;line-height:1">${d.count.toLocaleString()}</div>
+      </div>
+    </div>`;
+
+  if (!isBoss) {
+    // Mechanic view: deposit + their own reminder progress
+    const mine = (d.perMechanic || []).find(m => m.id === me.mechId);
+    const deposited = mine ? mine.deposited : 0;
+    let reminderCard = '';
+    if (r.on && r.target > 0) {
+      const remaining = Math.max(0, r.target - deposited);
+      const pct = Math.min(100, Math.round(deposited / r.target * 100));
+      const done = remaining === 0;
+      reminderCard = `
+        <div class="card mb-3" style="border:1px solid ${done?'var(--green)':'var(--accent)'}">
+          <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:${done?'var(--green)':'var(--accent)'};margin-bottom:6px">${done?'✅ Target met':'⚠ Reminder'}</div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:10px">${done
+            ? `You've handed in your ${r.target} boxes ${periodWord}. Nice!`
+            : `You still need to hand in <strong style="color:var(--accent)">${remaining}</strong> box${remaining!==1?'es':''} ${periodWord}.`}</div>
+          ${r.msg ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${r.msg}</div>` : ''}
+          <div style="height:10px;background:var(--surface3);border-radius:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${done?'var(--green)':'var(--accent)'}"></div></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px">${deposited} / ${r.target} boxes ${periodWord}</div>
+        </div>`;
+    }
+    el.innerHTML = totalCard + reminderCard + `
+      <div class="card mb-3">
+        <div class="card-title">Deposit boxes</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="box-deposit-qty" type="number" min="1" placeholder="How many?" style="flex:1"/>
+          <button class="btn btn-primary" onclick="boxDeposit()">Deposit</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px">Adds to the shop total and counts toward your hand-in.</div>
+      </div>
+      ${renderMyBoxDeposits(d.deposits)}`;
+    return;
+  }
+
+  // Boss view: set count, reminder settings, per-mechanic tracker, log
+  const perMech = (d.perMechanic || []);
+  el.innerHTML = totalCard + `
+    <div class="card mb-3">
+      <div class="card-title">Set shop box count</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="box-set-count" type="number" min="0" value="${d.count}" style="flex:1"/>
+        <button class="btn btn-outline" onclick="boxSetCount()">Set</button>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-title">Mechanic hand-in reminder</div>
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer">
+        <input type="checkbox" id="box-rem-on" ${r.on?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)"/>
+        <span style="font-weight:600;font-size:14px">Remind mechanics to hand in boxes</span>
+      </label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <span style="font-size:13px;color:var(--muted)">Each mechanic must hand in</span>
+        <input id="box-rem-target" type="number" min="0" value="${r.target||0}" style="width:90px"/>
+        <span style="font-size:13px;color:var(--muted)">boxes per</span>
+        <select id="box-rem-period" style="width:110px">
+          <option value="week" ${r.period!=='month'?'selected':''}>week</option>
+          <option value="month" ${r.period==='month'?'selected':''}>month</option>
+        </select>
+      </div>
+      <input id="box-rem-msg" placeholder="Custom message (optional)" value="${(r.msg||'').replace(/"/g,'&quot;')}" style="width:100%;margin-bottom:12px"/>
+      <button class="btn btn-primary btn-sm" onclick="boxSaveReminder()">Save reminder</button>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-title">Hand-ins ${periodWord}${r.target?` · target ${r.target}`:''}</div>
+      ${perMech.length ? perMech.map(m => {
+        const tgt = r.target || 0;
+        const pct = tgt ? Math.min(100, Math.round(m.deposited/tgt*100)) : 0;
+        const met = tgt && m.deposited >= tgt;
+        return `<div style="padding:9px 0;border-bottom:1px solid var(--line)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:17px">${m.avatar||'🔧'}</span>
+            <span style="flex:1;font-weight:600;font-size:13px">${m.name}</span>
+            <span style="font-size:13px;font-weight:700;color:${met?'var(--green)':'var(--text)'}">${m.deposited}${tgt?` / ${tgt}`:''}</span>
+            ${tgt?(met?'<span style="font-size:14px">✅</span>':'<span style="font-size:14px">⚠️</span>'):''}
+          </div>
+          ${tgt?`<div style="height:6px;background:var(--surface3);border-radius:4px;overflow:hidden;margin-top:6px"><div style="height:100%;width:${pct}%;background:${met?'var(--green)':'var(--accent)'}"></div></div>`:''}
+        </div>`;
+      }).join('') : '<div class="empty">No mechanics yet.</div>'}
+    </div>
+
+    ${renderMyBoxDeposits(d.deposits, true)}`;
+}
+
+function renderMyBoxDeposits(deposits, all = false) {
+  let list = deposits || [];
+  if (!all) list = list.filter(x => x.mechanic_id === me.mechId);
+  list = list.slice(0, 15);
+  if (!list.length) return '';
+  return `<div class="card mb-3">
+    <div class="card-title">${all ? 'Recent deposits' : 'Your recent deposits'}</div>
+    ${list.map(x => `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px">
+      <span style="flex:1">${all ? (x.mechanic_name||'—') : ''}${all?' · ':''}<span style="color:var(--muted)">${new Date(x.created_at).toLocaleString('en-ZA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span></span>
+      <span style="font-weight:700;color:var(--green)">+${x.qty}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+async function boxDeposit() {
+  const inp = document.getElementById('box-deposit-qty');
+  const qty = parseInt(inp.value);
+  if (!qty || qty <= 0) { toast('Enter how many boxes', 'error'); return; }
+  try { await POST('/boxes/deposit', { qty }); toast(`Deposited ${qty} boxes`, 'success'); renderBoxes(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function boxSetCount() {
+  const count = parseInt(document.getElementById('box-set-count').value);
+  if (isNaN(count) || count < 0) { toast('Enter a valid count', 'error'); return; }
+  try { await POST('/boxes/set', { count }); toast('Box count updated', 'success'); renderBoxes(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function boxSaveReminder() {
+  const on = document.getElementById('box-rem-on').checked;
+  const target = parseInt(document.getElementById('box-rem-target').value) || 0;
+  const period = document.getElementById('box-rem-period').value;
+  const msg = document.getElementById('box-rem-msg').value;
+  try { await POST('/boxes/reminder', { on, target, period, msg }); toast('Reminder saved', 'success'); renderBoxes(); }
+  catch(e) { toast(e.message, 'error'); }
 }
 
 function openMenu() { document.getElementById('menu-overlay').classList.add('open'); }
@@ -2699,14 +2915,15 @@ function renderOrders() {
     const mech = mechanics.find(m => m.id === o.mechanic_id);
     const addedDate = o.created_at ? new Date(o.created_at).toLocaleString('en-ZA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
     const doneDate  = o.done_at ? new Date(o.done_at).toLocaleString('en-ZA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : (o.status === 'done' && o.updated_at ? new Date(o.updated_at).toLocaleString('en-ZA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '');
+    const acct = o.client_type === 'tab' ? orderTabName(o) : '';
+    const mechLabel = mech ? mech.name : (o.mechanic_name || '');
     return `<div class="order-card" onclick="openOrderDetail('${o.id}')">
       <div class="oc-row">
-        <span class="oc-vehicle">${o.vehicle || '—'}</span>
+        <span class="oc-vehicle">${o.player || acct || '—'}</span>
         <span class="oc-price">R${(o.price||0).toLocaleString()}</span>
       </div>
       <div class="oc-meta">
-        ${o.plate ? o.plate + ' · ' : ''}${o.player || ''}
-        ${mech ? ` · ${mech.name}` : (o.mechanic_name ? ` · ${o.mechanic_name}` : '')}
+        ${acct ? `📒 ${acct}` : '👤 Regular'}${mechLabel ? ` · ${mechLabel}` : ''}
         <span class="badge badge-${o.status}" style="margin-left:6px">${o.status}</span>
       </div>
       <div class="bc-dates" style="margin-top:5px">
@@ -2715,6 +2932,13 @@ function renderOrders() {
       </div>
     </div>`;
   }).join('');
+}
+
+// Name of the tab account an order is billed to (falls back to the player name)
+function orderTabName(o) {
+  if (o.client_type !== 'tab') return '';
+  const t = tabs.find(t => String(t.id) === String(o.tab_id));
+  return t ? t.name : (o.player || 'Account');
 }
 
 // ══════════════════════════════════════════
@@ -2735,10 +2959,9 @@ function openOrderDetail(id) {
       <span class="badge badge-${o.status}">${o.status}</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;background:var(--surface2);border-radius:var(--radius);padding:12px">
-      <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Player</div><div style="font-weight:600;font-size:13px">${o.player||'—'}</div></div>
-      <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Plate</div><div style="font-weight:600;font-size:13px;font-family:'Barlow Condensed',system-ui,sans-serif;letter-spacing:.5px">${o.plate||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Client</div><div style="font-weight:600;font-size:13px">${o.player||'—'}</div></div>
       <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Mechanic</div><div style="font-weight:600;font-size:13px">${mech ? mech.avatar+' '+mech.name : (o.mechanic_name || '—')}</div></div>
-      <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Customer Type</div><div style="font-weight:600;font-size:13px">${o.client_type === 'tab' ? '📒 Tab Account' : '👤 Regular'}</div></div>
+      <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">${o.client_type === 'tab' ? 'Account' : 'Customer'}</div><div style="font-weight:600;font-size:13px">${o.client_type === 'tab' ? '📒 ' + orderTabName(o) : '👤 Regular'}</div></div>
       <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">📅 Added</div><div style="font-weight:600;font-size:13px">${o.created_at ? new Date(o.created_at).toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</div></div>
       <div><div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">✅ Completed</div><div style="font-weight:600;font-size:13px">${o.done_at ? new Date(o.done_at).toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : (o.status==='done'&&o.updated_at ? new Date(o.updated_at).toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—')}</div></div>
     </div>
@@ -2764,7 +2987,8 @@ function openOrderDetail(id) {
   if (canEdit) {
     btns.push(`<button class="btn btn-outline" style="flex:1" onclick="openEditOrder('${o.id}')">Edit</button>`);
   }
-  if ((me.role === 'boss' || me.role === 'admin' || me.role === 'dev') && o.status !== 'done') {
+  // Boss/admin/dev can delete ANY order (including completed ones); mechanics never can
+  if (me.role === 'boss' || me.role === 'admin' || me.role === 'dev') {
     btns.push(`<button class="btn btn-danger" style="flex:0 0 auto" onclick="deleteOrder('${o.id}')">Delete</button>`);
   }
   actions.innerHTML = btns.join('');
@@ -3628,92 +3852,310 @@ async function saveOrder() {
 // ══════════════════════════════════════════
 //  VISION SCAN
 // ══════════════════════════════════════════
+// Keys match the JG Mechanic tablet categories + ox_inventory item labels, so a
+// scanned work order maps every in-game item to the right shop price. Values use
+// the shop's standard prices; a matching entry in the shop's own price list wins.
 const PRICE_MAP = {
-  'headlights':35000,'head lights':35000,'extras':35000,'cosmetics':35000,
-  'body parts':35000,'respray':100000,'paint':100000,'paint layer':100000,
-  'wheels':35000,'wheel change':35000,'wheel smoke':35000,'stance':20000,
-  'stance kit':20000,'repair':20000,'repair kit':20000,'underglow':35000,
-  'under glow':35000,'neon':35000,'window tint':35000,'tint':35000,
-  'turbo':100000,'twin turbo':1000000,'engine':100000,'engine swap':100000,
-  'transmission':80000,'brakes':80000,'ceramic brakes':80000,
-  'tyres':50000,'tires':50000,'nos':20000,'nitrous':25000,
-  'drift':100000,'towing':20000,'callout':20000,
+  // ── Cosmetics / body ──
+  'cosmetics':35000,'cosmetic':35000,'cosmetic part':35000,'body kit':35000,'body parts':35000,'body part':35000,
+  'extras':35000,'extra':35000,'extras kit':35000,
+  'respray':100000,'respray kit':100000,'paint':100000,'paint layer':100000,'paint job':100000,
+  'wheels':35000,'wheel':35000,'vehicle wheels':35000,'vehicle wheels set':35000,'wheel change':35000,
+  'headlights':35000,'headlight':35000,'head lights':35000,'xenon headlights':35000,'xenon':35000,'xenons':35000,'lighting controller':35000,'lightingcontrol':35000,
+  'neon lights':35000,'neon':35000,'neons':35000,'under glow':35000,'underglow':35000,
+  'window tint':35000,'tint':35000,
+  'stance':20000,'stance kit':20000,'stancing kit':20000,
+  'tyre smoke':35000,'tyre smoke kit':35000,'custom tyre smoke':35000,'wheel smoke':35000,
+  // ── Tyres ──
+  'tyres':50000,'tyre':50000,'tires':50000,'tire':50000,'stack of tyres':50000,
+  'slick tyres':50000,'semi slick tyres':50000,'offroad tyres':50000,'tyre replacement':50000,'bulletproof tyres':50000,
+  // ── Brakes ──
+  'brakes':80000,'brake':80000,'ceramic brakes':80000,'street brakes':80000,'sport brakes':80000,'race brakes':80000,
+  'brake pads':80000,'brake pad':80000,'brake pad replacement':80000,'brakepad replacement':80000,
+  // ── Drivetrain / transmission ──
+  'transmission':80000,'street transmission':80000,'sports transmission':80000,'race transmission':80000,
+  'drivetrain':80000,'drivetrains':80000,'awd drivetrain':80000,'rwd drivetrain':80000,'fwd drivetrain':80000,
+  'awd':80000,'rwd':80000,'fwd':80000,'manual gearbox':80000,'gearbox':80000,
+  // ── Turbo ──
+  'turbocharging':100000,'turbo charger':100000,'turbocharger':100000,'turbo upgrade':100000,'turbo':100000,
+  'stage 1 turbo':100000,'stage 2 turbo':100000,'stage 3 turbo':100000,'twin turbo':1000000,
+  // ── Engine ──
+  'engine':100000,'engine swap':100000,'engine swaps':100000,'ems upgrade':100000,'engine block':100000,
+  'v12 engine':100000,'v8 engine':100000,'v6 engine':100000,'i4 engine':100000,
+  'stage 1 engine':100000,'stage 2 engine':100000,'stage 3 engine':100000,
+  // ── Suspension / performance / repair ──
+  'suspension':35000,'suspension parts':35000,'lowered suspension':35000,
+  'performance':100000,'performance part':100000,
+  'repair':20000,'repair kit':20000,'repair vehicle':20000,
+  'drift tuning':100000,'drift tuning kit':100000,'drift':100000,
+  // ── Nitrous ──
+  'nitrous':20000,'nitrous bottle':20000,'nos':20000,'nitrous install kit':25000,
+  // ── Services (no default price — shop can set; left at 0 so they still import) ──
+  'engine oil':0,'clutch replacement':0,'air filter':0,'spark plug':0,'cleaning kit':0,
+  'ev motor':0,'ev battery':0,'ev coolant':0,'empty nitrous bottle':0,
+  'towing':20000,'callout':20000,
 };
+
+// Preprocess a screenshot for OCR: upscale, grayscale, auto-invert light-on-dark
+// UIs (the FiveM tablet), then either a hard binary threshold ('threshold' — what
+// Tesseract reads most reliably) or a softer contrast stretch ('contrast').
+function preprocessForOcr(file, mode = 'threshold') {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(3, Math.max(1.5, 1800 / Math.max(1, img.width))); // upscale small text
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      const d = ctx.getImageData(0, 0, w, h);
+      const p = d.data;
+      // grayscale + mean luminance
+      let sum = 0;
+      const gray = new Float32Array(p.length / 4);
+      for (let i = 0, j = 0; i < p.length; i += 4, j++) {
+        const g = 0.299*p[i] + 0.587*p[i+1] + 0.114*p[i+2];
+        gray[j] = g; sum += g;
+      }
+      const mean = sum / gray.length;
+      const invert = mean < 128;            // dark UI → make text dark on light
+      for (let i = 0, j = 0; i < p.length; i += 4, j++) {
+        let g = invert ? 255 - gray[j] : gray[j];
+        if (mode === 'threshold') {
+          // Otsu-ish: push away from a mid cutoff into pure black/white
+          g = g < 150 ? 0 : 255;
+        } else {
+          g = Math.max(0, Math.min(255, (g - 110) * 2.1 + 128));
+        }
+        p[i] = p[i+1] = p[i+2] = g;
+      }
+      ctx.putImageData(d, 0, 0);
+      c.toBlob(b => resolve(b), 'image/png');
+    };
+    img.onerror = () => reject(new Error('Could not read that image'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// Free, in-browser OCR via Tesseract.js — no API key, runs entirely client-side.
+async function ocrImage(file, onProgress, mode = 'threshold') {
+  if (typeof Tesseract === 'undefined') throw new Error('OCR engine still loading — try again in a moment');
+  let input = file;
+  try { input = await preprocessForOcr(file, mode); } catch(e) { /* fall back to raw file */ }
+  const { data } = await Tesseract.recognize(input, 'eng', {
+    logger: m => { if (onProgress && m.status === 'recognizing text') onProgress(Math.round((m.progress||0)*100)); }
+  });
+  return data.text || '';
+}
+
+// Reads the work order in TWO passes with different image prep and merges the
+// results — one pass usually recovers what the other missed. Auto-fills the order.
+async function runWorkOrderScan(file) {
+  const status = document.getElementById('scan-status');
+  if (status) status.textContent = 'Scanning… 0%';
+  try {
+    const modes = ['threshold', 'contrast'];
+    const merged = { name: '', parts: [] };
+    const seen = new Set();
+    for (let mi = 0; mi < modes.length; mi++) {
+      const text = await ocrImage(file, pct => {
+        if (status) status.textContent = `Scanning… ${Math.round((mi * 100 + pct) / modes.length)}%`;
+      }, modes[mi]);
+      const r = parseWorkOrderText(text);
+      if (!merged.name && r.name) merged.name = r.name;
+      r.parts.forEach(p => { const k = p.name.toLowerCase(); if (!seen.has(k)) { seen.add(k); merged.parts.push(p); } });
+    }
+    applyWorkOrder(merged);
+    const n = merged.parts.length;
+    if (!n && !merged.name) {
+      if (status) status.textContent = '⚠ Couldn\'t read it — try a sharper, straight-on shot';
+      toast('Couldn\'t read that screenshot. Use a clear, straight-on capture.', 'error');
+    } else {
+      const bits = [];
+      if (merged.name) bits.push(`client ${merged.name}`);
+      if (n) bits.push(`${n} part${n!==1?'s':''}`);
+      if (status) status.textContent = '✅ ' + bits.join(' · ');
+      toast('Imported ' + bits.join(' · '), 'success');
+    }
+  } catch(err) {
+    if (status) status.textContent = '❌ ' + err.message;
+    toast('Scan failed: ' + err.message, 'error');
+  }
+}
+
+// Merge a parsed work order straight into the open order (no review step)
+function applyWorkOrder(res) {
+  if (res.name) document.getElementById('o-player').value = res.name;
+  const existing = new Set(orderParts.map(p => p.name.toLowerCase()));
+  res.parts.forEach(p => { if (!existing.has(p.name.toLowerCase())) orderParts.push(p); });
+  renderPartsDisplay();
+  recalcOrderTotal();
+}
 
 async function scanWorkOrder(input) {
   const file = input.files[0];
   if (!file) return;
-  const status = document.getElementById('scan-status');
-  status.textContent = 'Scanning…';
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const base64 = e.target.result.split(',')[1];
-    try {
-      const res = await POST('/vision/scan', { image: base64 });
-      const text = res.text || '';
-      parseWorkOrderText(text);
-      status.textContent = '✅ Done';
-    } catch(err) {
-      status.textContent = '❌ ' + err.message;
-    }
-    input.value = '';
-  };
-  reader.readAsDataURL(file);
+  await runWorkOrderScan(file);
+  input.value = '';
 }
 
+// Paste a screenshot straight in (Ctrl/Cmd+V) while the New Order modal is open
+document.addEventListener('paste', (e) => {
+  const modal = document.getElementById('order-modal');
+  if (!modal || !modal.classList.contains('open')) return; // only when the order modal is up
+  const items = (e.clipboardData || window.clipboardData)?.items || [];
+  for (const it of items) {
+    if (it.type && it.type.startsWith('image/')) {
+      const file = it.getAsFile();
+      if (file) { e.preventDefault(); runWorkOrderScan(file); }
+      return;
+    }
+  }
+});
+
+// Edit distance (for fuzzy-matching OCR'd part names against known parts)
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let cur = [i];
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + cost);
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+// Title-case a part label but keep in-game acronyms upper (AWD Drivetrain, NOS, V8…)
+function prettyPartLabel(name) {
+  let s = name.replace(/\b\w/g, c => c.toUpperCase());
+  s = s.replace(/\b(Awd|Rwd|Fwd|Ev|Nos|Ems|Ice|V12|V8|V6|I4)\b/gi, m => m.toUpperCase());
+  return s;
+}
+
+// Clean an OCR'd part name: strip trailing "installed/ready/✓", bracket junk, stray symbols
+function cleanPartName(s) {
+  return s.replace(/[✓✗×»>|]+/g, ' ')
+          .replace(/\b(installed|ready|to install|install|done|complete)\b/ig, '')
+          .replace(/[^A-Za-z0-9 &/+-]/g, ' ')
+          .replace(/\s+/g, ' ').trim();
+}
+
+// Parse OCR text → { name, plate, parts:[{name,price,qty}] }. Pure: no DOM writes.
 function parseWorkOrderText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  // Plate — "Connected to [9AV967JM" or "Connected to 9AV967JM"
+  const out = { name: '', plate: '', parts: [] };
+
+  // Plate — "Connected to XXXX" or a "PLATE" label line
   const plateMatch = text.match(/Connected to \[?([A-Z0-9]{3,8})/i);
-  if (plateMatch) document.getElementById('o-plate').value = plateMatch[1].toUpperCase();
-  // Plate fallback — "PLATE\nXXXXXX" label pattern
-  if (!document.getElementById('o-plate').value) {
+  if (plateMatch) out.plate = plateMatch[1].toUpperCase();
+  if (!out.plate) {
     const plateIdx = lines.findIndex(l => /^plate$/i.test(l));
-    if (plateIdx >= 0 && lines[plateIdx+1] && /^[A-Z0-9]{3,8}$/.test(lines[plateIdx+1])) {
-      document.getElementById('o-plate').value = lines[plateIdx+1].toUpperCase();
+    if (plateIdx >= 0 && lines[plateIdx+1] && /^[A-Z0-9]{3,8}$/.test(lines[plateIdx+1].replace(/\s/g,''))) {
+      out.plate = lines[plateIdx+1].replace(/\s/g,'').toUpperCase();
     }
   }
-  // Customer/Player name — "CUSTOMER\nFirstname Lastname"
-  const custIdx = lines.findIndex(l => /^customer$/i.test(l));
-  if (custIdx >= 0 && !document.getElementById('o-player').value) {
-    // Look forward from CUSTOMER label for the first line that looks like a real name
-    for (let ci = custIdx + 1; ci < Math.min(custIdx + 4, lines.length); ci++) {
-      const nameCandidate = lines[ci];
-      if (!nameCandidate) continue;
-      // Skip UI labels, part lines like "Respray (1x)", "✓ Installed", lone numbers
-      if (/^(plate|status|amount|mechanic|parts|home|logout|on duty|disconnect|back|installed|ready)/i.test(nameCandidate)) continue;
-      if (/\(\d+x\)/i.test(nameCandidate)) continue;           // part quantity pattern
-      if (/^[R$]?\d/.test(nameCandidate)) continue;             // price / number
-      if (/^[✓✗×]/u.test(nameCandidate)) continue;             // checkmark lines
-      if (nameCandidate.length < 2 || nameCandidate.length > 40) continue;
-      document.getElementById('o-player').value = nameCandidate;
-      break;
+
+  // Customer/Client name — a "Firstname Lastname" near the CUSTOMER label, skipping
+  // UI/part words (the tablet's two columns interleave the name into part lines).
+  const NAME_STOP = new Set(('installed ready install parts part work order status amount paid customer client name mechanic plate connected home logout disconnect duty vehicle complete mark cosmetics cosmetic headlights headlight xenon xenons extras extra respray wheels wheel tyres tyre tires brakes brake turbo turbocharger engine transmission drivetrain suspension performance stance stancing repair neon neons underglow tint nitrous nos drift gearbox manual street sport sports race ceramic slick semi offroad bulletproof ems stage smoke body kit lighting controller'.split(' ')));
+  const custIdx = lines.findIndex(l => /\b(customer|client)\b/i.test(l));
+  {
+    const searchLines = custIdx >= 0 ? lines.slice(custIdx, custIdx + 5) : lines;
+    outer:
+    for (const line of searchLines) {
+      const words = (line.match(/[A-Za-z][A-Za-z'’-]{1,}/g) || []);
+      for (let i = 0; i < words.length - 1; i++) {
+        const a = words[i], b = words[i+1];
+        if (!/^[A-Z]/.test(a) || !/^[A-Z]/.test(b)) continue;
+        if (NAME_STOP.has(a.toLowerCase()) || NAME_STOP.has(b.toLowerCase())) continue;
+        if (a.length < 2 || b.length < 2) continue;
+        out.name = `${a} ${b}`.replace(/[^A-Za-z0-9 .'-]/g,'').trim();
+        break outer;
+      }
     }
   }
-  // Vehicle — not present in tablet screenshot; skip guessing
-  // Parts: "PartName (Nx)"
-  const partRe = /^(.+?)\s*\((\d+)x\)/i;
-  let found = 0;
+
+  // Vocabulary of known part names (price map + this shop's price list)
+  const vocab = [];
+  for (const [k, v] of Object.entries(PRICE_MAP)) vocab.push({ key: k, name: k, price: v });
+  (prices || []).forEach(p => vocab.push({ key: p.name.toLowerCase(), name: p.name, price: parseInt(p.price) || 0 }));
+  vocab.sort((a, b) => b.key.length - a.key.length);
+
+  const skip = /(parts? to install|work order|ready to install|^status|amount paid|^customer|^plate|^mechanic|on duty|disconnect|logout|^home|^back|connected to)/i;
+  const qtyOf = (line) => {
+    const m = line.match(/[\(\[]?\s*(\d{1,3})\s*[xX×*]/) || line.match(/[xX×*]\s*(\d{1,3})/);
+    return m ? Math.min(999, parseInt(m[1]) || 1) : 1;
+  };
+  const seen = new Set();
+  const addPart = (name, price, qty) => {
+    const k = name.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.parts.push({ name, price, qty });
+  };
+
   lines.forEach(line => {
-    const m = line.match(partRe);
-    if (!m) return;
-    const rawName = m[1].trim();
-    const qty = parseInt(m[2]) || 1;
-    const key = rawName.toLowerCase();
-    let price = 0;
-    for (const [k, v] of Object.entries(PRICE_MAP)) {
-      if (key.includes(k)) { price = v; break; }
+    if (skip.test(line)) return;
+    const low = line.toLowerCase();
+    let hit = vocab.find(v => v.key.length >= 3 && low.includes(v.key));
+    if (!hit) { // fuzzy: OCR mangled the part NAME itself (e.g. "Resptay" → "respray")
+      const words = low.match(/[a-z]{2,}/g) || [];
+      let best = null, bestD = Infinity;
+      for (const v of vocab) {
+        if (v.key.length < 4) continue;
+        const kw = v.key.split(/\s+/).length;
+        const tol = Math.max(1, Math.floor(v.key.length * 0.25));
+        for (let i = 0; i + kw <= words.length; i++) {
+          const cand = words.slice(i, i + kw).join(' ');
+          if (Math.abs(cand.length - v.key.length) > tol) continue;
+          const dist = levenshtein(cand, v.key);
+          if (dist <= tol && dist < bestD) { best = v; bestD = dist; }
+        }
+      }
+      if (best) hit = best;
     }
-    // Also check shop prices
-    const shopPrice = prices.find(p => p.name.toLowerCase() === key);
-    if (shopPrice) price = parseInt(shopPrice.price);
-    orderParts.push({ name: rawName, price, qty });
-    found++;
+    if (hit) { addPart(prettyPartLabel(hit.name), hit.price, qtyOf(line)); return; }
+    const m = line.match(/([A-Za-z][A-Za-z &/+-]{1,28}?)\s*[\(\[]\s*(\d{1,3})\s*[xX×*]/);
+    if (m) {
+      const nm = cleanPartName(m[1]);
+      if (nm.length >= 2) addPart(prettyPartLabel(nm), 0, Math.min(999, parseInt(m[2]) || 1));
+    }
   });
-  if (found) {
-    renderPartsDisplay();
-    recalcOrderTotal();
-  }
+
+  // Whole-text safety net — the fixed set of JG work-order parts. Catches a part
+  // whose line was badly segmented, as long as its name appears somewhere in the
+  // OCR text (exact word or a close fuzzy match). Restricted to this known list to
+  // avoid false positives.
+  const WORKORDER_PARTS = ['Headlights','Cosmetics','Extras','Respray','Wheels','Neon Lights','Window Tint','Stance','Tyres','Tyre Smoke','Bulletproof Tyres','Ceramic Brakes','Transmission','Turbocharging','Engine Swap','Nitrous','Suspension','Repair','Performance'];
+  const priceFor = (label) => {
+    const k = label.toLowerCase();
+    const shop = (prices || []).find(p => p.name.toLowerCase() === k);
+    if (shop) return parseInt(shop.price) || 0;
+    return PRICE_MAP[k] != null ? PRICE_MAP[k] : 0;
+  };
+  const fullLow = ' ' + lines.join('  ').toLowerCase() + ' ';
+  const allWords = fullLow.match(/[a-z]{2,}/g) || [];
+  WORKORDER_PARTS.forEach(label => {
+    if (seen.has(label.toLowerCase())) return;
+    const key = label.toLowerCase();
+    const kw = key.split(/\s+/).length;
+    let matched = fullLow.includes(' ' + key + ' ');
+    if (!matched && key.length >= 6) {
+      const tol = Math.max(1, Math.floor(key.length * 0.2));
+      for (let i = 0; i + kw <= allWords.length && !matched; i++) {
+        const cand = allWords.slice(i, i + kw).join(' ');
+        if (Math.abs(cand.length - key.length) <= tol && levenshtein(cand, key) <= tol) matched = true;
+      }
+    }
+    if (matched) addPart(label, priceFor(label), 1);
+  });
+
+  return out;
 }
 
 // ══════════════════════════════════════════
@@ -4929,17 +5371,9 @@ async function processScanImage(input) {
   if (!file) return;
   toast('Scanning image…', 'info');
 
-  // Convert to base64
-  const base64 = await new Promise(res => {
-    const r = new FileReader();
-    r.onload = e => res(e.target.result.split(',')[1]);
-    r.readAsDataURL(file);
-  });
-
   let rawText = '';
   try {
-    const result = await POST('/vision/scan', { image: base64 });
-    rawText = result.text || '';
+    rawText = await ocrImage(file);
   } catch(e) {
     toast('Scan failed: ' + e.message, 'error');
     return;
@@ -5499,7 +5933,7 @@ function renderCraftPage() {
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden">
               <button onclick="craftQtyChange('${r.id}', -1)" style="width:34px;height:34px;background:none;border:none;color:var(--text);font-size:17px;cursor:pointer;font-weight:700">−</button>
-              <input id="craft-qty-${r.id}" type="number" min="1" max="10" value="1" style="width:46px;height:34px;background:none;border:none;text-align:center;color:var(--text);font-size:14px;font-weight:700;padding:0" oninput="craftQtyUpdate('${r.id}')"/>
+              <input id="craft-qty-${r.id}" type="number" min="1" max="999" value="1" style="width:46px;height:34px;background:none;border:none;text-align:center;color:var(--text);font-size:14px;font-weight:700;padding:0" oninput="craftQtyUpdate('${r.id}')"/>
               <button onclick="craftQtyChange('${r.id}', 1)" style="width:34px;height:34px;background:none;border:none;color:var(--text);font-size:17px;cursor:pointer;font-weight:700">+</button>
             </div>
             <button onclick="craftSetMax('${r.id}', ${maxCraftable})" style="padding:0 12px;height:34px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted2);font-size:12px;font-weight:600;cursor:pointer">Max</button>
@@ -5729,7 +6163,7 @@ function toggleCraftAccordion(recipeId) {
 function craftQtyChange(recipeId, delta) {
   const inp = document.getElementById(`craft-qty-${recipeId}`);
   if (!inp) return;
-  const v = Math.min(10, Math.max(1, (parseInt(inp.value)||1) + delta));
+  const v = Math.min(999, Math.max(1, (parseInt(inp.value)||1) + delta));
   inp.value = v;
   craftQtyUpdate(recipeId);
 }
@@ -5737,7 +6171,7 @@ function craftQtyChange(recipeId, delta) {
 function craftSetMax(recipeId, max) {
   const inp = document.getElementById(`craft-qty-${recipeId}`);
   if (!inp) return;
-  inp.value = Math.min(10, Math.max(1, max));
+  inp.value = Math.min(999, Math.max(1, max));
   craftQtyUpdate(recipeId);
 }
 
@@ -5747,7 +6181,7 @@ function craftQtyUpdate(recipeId) {
   const breakdownEl = document.getElementById(`craft-breakdown-${recipeId}`);
   if (!inp || !resultEl) return;
 
-  const qty = Math.min(10, Math.max(1, parseInt(inp.value)||1));
+  const qty = Math.min(999, Math.max(1, parseInt(inp.value)||1));
   inp.value = qty; // enforce cap
 
   // Find the recipe
@@ -5986,10 +6420,13 @@ async function openTabDetail(id) {
       </div>
     </div>
     <div class="fg"><label>Description</label><input id="charge-desc" placeholder="e.g. Sultan RS Respray"/></div>
-    <div class="btn-row" style="margin-bottom:20px">
+    <div class="btn-row" style="margin-bottom:12px">
       <button class="btn btn-primary" style="flex:1" onclick="chargeTab(${id})">Apply</button>
-      <button class="btn btn-outline" onclick="exportTabStatement(${id},'${t.name.replace(/'/g,"\\'")}')">Export Week</button>
       <button class="btn btn-danger btn-sm" onclick="deleteTabConfirm(${id})">Delete</button>
+    </div>
+    <div class="btn-row" style="margin-bottom:20px">
+      <button class="btn btn-outline" style="flex:1" onclick="exportTabInvoice(${id},'${t.name.replace(/'/g,"\\'")}')">🧾 Invoice (for Discord)</button>
+      <button class="btn btn-outline btn-sm" onclick="exportTabStatement(${id},'${t.name.replace(/'/g,"\\'")}')">CSV</button>
     </div>
     <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:12px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Transaction History</div>
     <div id="tab-history">${historyHtml}</div>`;
@@ -6036,6 +6473,117 @@ async function exportTabStatement(id, name) {
     URL.revokeObjectURL(url);
     toast('Statement exported', 'success');
   } catch(e) { toast('Export failed', 'error'); }
+}
+
+// Render a clean invoice PNG for the tab account — download & drag into Discord.
+async function exportTabInvoice(id, name) {
+  const tab = tabs.find(t => t.id === id);
+  let charges = [];
+  try { charges = await GET(`/tabs/${id}/charges`); } catch(e) {}
+  charges = charges.slice().reverse(); // oldest → newest
+  const balance = parseFloat(tab?.balance || 0);
+  const shop = (me.shopName || 'Mechanic Shop');
+  const now = new Date();
+  const invNo = `${id}-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+
+  // layout
+  const W = 860, pad = 44, rowH = 34, headerH = 150, metaH = 96, tableHeadH = 40, totalH = 86, footH = 46;
+  const bodyRows = Math.max(charges.length, 1);
+  const H = headerH + metaH + tableHeadH + bodyRows * rowH + totalH + footH + pad;
+  const scale = 2; // crisp on retina / Discord
+  const c = document.createElement('canvas'); c.width = W * scale; c.height = H * scale;
+  const x = c.getContext('2d'); x.scale(scale, scale);
+  const money = n => 'R' + Math.round(n).toLocaleString('en-ZA');
+
+  // background
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+  // header band
+  x.fillStyle = '#1b1030'; x.fillRect(0, 0, W, headerH);
+  x.fillStyle = '#9333ea'; x.fillRect(0, headerH - 6, W, 6);
+  x.fillStyle = '#ffffff';
+  x.font = '700 34px Arial'; x.textBaseline = 'alphabetic';
+  x.fillText(shop.toUpperCase(), pad, 64);
+  x.font = '600 15px Arial'; x.fillStyle = '#c9b8ec';
+  x.fillText('MECHANIC SERVICES · INVOICE', pad, 92);
+  x.textAlign = 'right';
+  x.font = '800 40px Arial'; x.fillStyle = '#ffffff';
+  x.fillText('INVOICE', W - pad, 70);
+  x.font = '600 14px Arial'; x.fillStyle = '#c9b8ec';
+  x.fillText('#' + invNo, W - pad, 96);
+  x.textAlign = 'left';
+
+  // meta: billed to + date
+  let y = headerH + 36;
+  x.fillStyle = '#8a8a8a'; x.font = '700 11px Arial';
+  x.fillText('BILLED TO', pad, y);
+  x.fillText('DATE', W - pad - 180, y);
+  x.fillStyle = '#1b1030'; x.font = '700 20px Arial';
+  x.fillText(name, pad, y + 26);
+  x.font = '600 15px Arial';
+  x.fillText(now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }), W - pad - 180, y + 24);
+
+  // table header
+  y = headerH + metaH + 8;
+  x.fillStyle = '#f1ecf8'; x.fillRect(pad, y, W - pad * 2, tableHeadH);
+  x.fillStyle = '#5a4a6a'; x.font = '700 12px Arial';
+  x.fillText('DATE', pad + 14, y + 26);
+  x.fillText('DESCRIPTION', pad + 120, y + 26);
+  x.textAlign = 'right';
+  x.fillText('AMOUNT', W - pad - 14, y + 26);
+  x.textAlign = 'left';
+
+  // rows
+  y += tableHeadH;
+  if (!charges.length) {
+    x.fillStyle = '#9a9a9a'; x.font = '500 14px Arial';
+    x.fillText('No transactions on record.', pad + 14, y + 22);
+    y += rowH;
+  } else {
+    charges.forEach((ch, i) => {
+      if (i % 2) { x.fillStyle = '#faf8fd'; x.fillRect(pad, y, W - pad * 2, rowH); }
+      const d = new Date(ch.created_at);
+      const isPay = ch.mode === 'payment';
+      x.fillStyle = '#333'; x.font = '500 13px Arial';
+      x.fillText(d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' }), pad + 14, y + 22);
+      let desc = ch.description || (isPay ? 'Payment' : 'Charge');
+      if (desc.length > 52) desc = desc.slice(0, 51) + '…';
+      x.fillText(desc, pad + 120, y + 22);
+      x.textAlign = 'right';
+      x.fillStyle = isPay ? '#1a7a40' : '#b3261e'; x.font = '700 13px Arial';
+      x.fillText((isPay ? '− ' : '+ ') + money(ch.amount), W - pad - 14, y + 22);
+      x.textAlign = 'left';
+      y += rowH;
+    });
+  }
+
+  // total due
+  y += 14;
+  x.fillStyle = '#1b1030'; x.fillRect(pad, y, W - pad * 2, totalH - 14);
+  x.fillStyle = '#c9b8ec'; x.font = '700 13px Arial';
+  x.fillText('AMOUNT DUE', pad + 20, y + 30);
+  x.textAlign = 'right';
+  x.fillStyle = balance > 0 ? '#ffffff' : '#7fe0a8'; x.font = '800 32px Arial';
+  x.fillText(money(balance), W - pad - 20, y + 42);
+  x.textAlign = 'left';
+
+  // footer
+  y = H - footH + 24;
+  x.fillStyle = '#9a9a9a'; x.font = '500 12px Arial';
+  x.fillText(`Generated ${now.toLocaleString('en-ZA')} · ${shop}`, pad, y);
+  x.textAlign = 'right';
+  x.fillText('Thank you!', W - pad, y);
+  x.textAlign = 'left';
+
+  // download
+  c.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice-${name.replace(/\s+/g,'-')}-${invNo}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Invoice saved — drag it into Discord', 'success');
+  }, 'image/png');
 }
 
 async function deleteTabConfirm(id) {
@@ -6272,8 +6820,40 @@ async function clearLog() {
 // ══════════════════════════════════════════
 //  ADMIN
 // ══════════════════════════════════════════
+async function loadShopRevenue() {
+  const el = document.getElementById('admin-revenue');
+  if (!el) return;
+  let data;
+  try { data = await GET('/shops/revenue'); } catch(e) { el.innerHTML = `<div class="empty">Couldn't load revenue.</div>`; return; }
+  if (!data.length) { el.innerHTML = '<div class="empty">No shops.</div>'; return; }
+  const totWk = data.reduce((s,x)=>s+x.week.total,0), totMo = data.reduce((s,x)=>s+x.month.total,0);
+  el.innerHTML = `
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="text-align:left;color:var(--muted);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em">
+          <th style="padding:6px 8px">Shop</th>
+          <th style="padding:6px 8px;text-align:right">This Week</th>
+          <th style="padding:6px 8px;text-align:right">This Month</th>
+        </tr></thead>
+        <tbody>
+          ${data.map(s => `<tr style="border-top:1px solid var(--line)">
+            <td style="padding:9px 8px;font-weight:600">${s.name}</td>
+            <td style="padding:9px 8px;text-align:right"><span style="color:var(--green);font-weight:700">R${s.week.total.toLocaleString()}</span><span style="color:var(--muted);font-size:11px"> · ${s.week.jobs} job${s.week.jobs!==1?'s':''}</span></td>
+            <td style="padding:9px 8px;text-align:right"><span style="color:var(--green);font-weight:700">R${s.month.total.toLocaleString()}</span><span style="color:var(--muted);font-size:11px"> · ${s.month.jobs} job${s.month.jobs!==1?'s':''}</span></td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="border-top:2px solid var(--line);font-weight:800">
+          <td style="padding:9px 8px">All shops</td>
+          <td style="padding:9px 8px;text-align:right;color:var(--green)">R${totWk.toLocaleString()}</td>
+          <td style="padding:9px 8px;text-align:right;color:var(--green)">R${totMo.toLocaleString()}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+}
+
 function renderAdmin() {
   loadShopsOverview();   // every shop's bosses + workers on one page
+  loadShopRevenue();     // money per shop (week + month)
   loadAdminShops();      // rename / delete / clear data
 
   const online = mechanics.filter(m => m.clocked_in);

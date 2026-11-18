@@ -29,6 +29,31 @@ router.get('/overview', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Admin revenue — money each shop generated this week + this month (completed orders)
+router.get('/revenue', async (req, res) => {
+  const u = req.session.user;
+  if (!u || (u.role !== 'admin' && u.role !== 'dev')) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const now = new Date();
+    const weekStart = new Date(now); weekStart.setHours(0,0,0,0); weekStart.setDate(now.getDate() - now.getDay()); // Sunday 00:00
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const { rows: shops } = await pool.query('SELECT id, name, logo_image, logo_emoji FROM shops ORDER BY name');
+    const { rows: wk } = await pool.query(
+      `SELECT shop_id, COALESCE(SUM(price),0)::float AS total, COUNT(*)::int AS jobs
+       FROM orders WHERE status='done' AND COALESCE(done_at, updated_at, created_at) >= $1 GROUP BY shop_id`, [weekStart]);
+    const { rows: mo } = await pool.query(
+      `SELECT shop_id, COALESCE(SUM(price),0)::float AS total, COUNT(*)::int AS jobs
+       FROM orders WHERE status='done' AND COALESCE(done_at, updated_at, created_at) >= $1 GROUP BY shop_id`, [monthStart]);
+    const wkMap = Object.fromEntries(wk.map(r => [r.shop_id, r]));
+    const moMap = Object.fromEntries(mo.map(r => [r.shop_id, r]));
+    res.json(shops.map(s => ({
+      id: s.id, name: s.name, logo_image: s.logo_image, logo_emoji: s.logo_emoji,
+      week:  { total: wkMap[s.id]?.total || 0, jobs: wkMap[s.id]?.jobs || 0 },
+      month: { total: moMap[s.id]?.total || 0, jobs: moMap[s.id]?.jobs || 0 },
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Register a new shop
 router.post('/register', async (req, res) => {
   const { name } = req.body;

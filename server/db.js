@@ -144,6 +144,21 @@ async function initDb() {
     ALTER TABLE shops ADD COLUMN IF NOT EXISTS logo_emoji  TEXT DEFAULT '🔧';
     ALTER TABLE shops ADD COLUMN IF NOT EXISTS logo_image  TEXT;
     ALTER TABLE shops ADD COLUMN IF NOT EXISTS stage_config JSONB DEFAULT '{}'::jsonb;
+    -- Recyclable boxes: shop stock + a per-mechanic hand-in reminder
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS boxes_count         INTEGER DEFAULT 0;
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS box_reminder_on     BOOLEAN DEFAULT false;
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS box_reminder_target INTEGER DEFAULT 100;
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS box_reminder_period TEXT DEFAULT 'week';
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS box_reminder_msg    TEXT;
+
+    CREATE TABLE IF NOT EXISTS box_deposits (
+      id            SERIAL PRIMARY KEY,
+      shop_id       INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+      mechanic_id   INTEGER REFERENCES mechanics(id) ON DELETE SET NULL,
+      mechanic_name TEXT,
+      qty           INTEGER NOT NULL DEFAULT 0,
+      created_at    TIMESTAMPTZ DEFAULT NOW()
+    );
 
     CREATE TABLE IF NOT EXISTS stock_items (
       id         SERIAL PRIMARY KEY,
